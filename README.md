@@ -30,6 +30,43 @@ dependencies: [
 ]
 ```
 
+## Trace Context Core
+
+`TraceParent` generates, validates, and serializes the W3C Trace Context version `00` format.
+It is a value only: tracing lifecycles, sampling policies, and network propagation remain the caller's responsibility.
+
+```swift
+import Telescopium
+
+// Uses the system random source; version and flags default to 00.
+let generated = TraceParent.random()
+let header = generated.headerValue
+
+// Strictly parses a complete lowercase version 00 header.
+if let parsed = TraceParent(headerValue: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01") {
+    let explicit = TraceParent(
+        traceId: parsed.traceId,
+        spanId: parsed.spanId,
+        flags: 0
+    )
+    print(explicit.headerValue)
+}
+
+// A fixed seed reproduces the sequence for tests and debugging.
+var generator = SeededRandomNumberGenerator(seed: 42)
+let reproducible = TraceParent.random(using: &generator)
+let next = TraceParent.random(using: &generator)
+```
+
+`TraceParent`, `TraceId`, and `SpanId` conform to `Sendable`, `Hashable` (including `Equatable`), and `Codable`.
+They encode as single strings and reject invalid strings during decoding.
+Identifiers preserve leading zeros and reject all-zero values. Header parsing rejects unsupported versions,
+uppercase hexadecimal, extra fields, and surrounding whitespace. Raw flag bytes are preserved.
+
+The seeded generator uses SplitMix64 and is not cryptographically secure. Use the default system random
+source for production identifiers; restarting a fixed seed repeats identifiers. A trace identifier consumes
+two random words (high, then low), followed by one word for the span identifier; all-zero identifiers are retried.
+
 ## Quick Start
 
 ### Basic Logging
