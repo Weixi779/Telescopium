@@ -1,4 +1,4 @@
-# Logger
+# Telescopium
 
 A comprehensive Swift logging library built on Apple's unified logging system with performance measurement and log export capabilities.
 
@@ -22,11 +22,11 @@ A comprehensive Swift logging library built on Apple's unified logging system wi
 
 ### Swift Package Manager
 
-Add Logger to your project using Xcode or by adding it to your `Package.swift`:
+Add Telescopium to your project using Xcode or by adding it to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/your-username/Logger.git", from: "1.0.0")
+    .package(url: "https://github.com/Weixi779/Telescopium.git", from: "1.0.0")
 ]
 ```
 
@@ -35,7 +35,7 @@ dependencies: [
 ### Basic Logging
 
 ```swift
-import Logger
+import Telescopium
 
 let logger = Logger()
 logger.debug("App started")
@@ -55,7 +55,7 @@ featureLogger.debug("Connection established")
 ### Structured Metadata
 
 ```swift
-import Logger
+import Telescopium
 
 let logger = Logger(category: "Auth")
 logger.info("Login succeeded", metadata: [
@@ -68,7 +68,7 @@ logger.info("Login succeeded", metadata: [
 ### Setup Logger System (Optional)
 
 ```swift
-import Logger
+import Telescopium
 
 /// Example exporter. Replace with your own OTLP/HTTP implementation.
 final class RemoteExporter: LogExporter {
@@ -99,7 +99,7 @@ LoggerSystem.setup(
 ### Redaction-Only Example
 
 ```swift
-import Logger
+import Telescopium
 
 struct NoOpExporter: LogExporter {
     func export(_ record: LogRecord) {}
@@ -123,7 +123,7 @@ LoggerSystem.setup(
 ### Performance Measurement
 
 ```swift
-import Logger
+import Telescopium
 
 let logger = Logger()
 
@@ -150,7 +150,7 @@ logger.event("checkpoint_reached", "Processing 50% complete")
 ### Log Export & Analysis
 
 ```swift
-import Logger
+import Telescopium
 
 // Export logs for debug analysis
 do {
@@ -207,7 +207,7 @@ let cacheLogger = Logger(category: "Cache")
 
 ## Performance Analysis
 
-Logger integrates with **Instruments** for visual performance analysis:
+Telescopium integrates with **Instruments** for visual performance analysis:
 
 1. **Run your app with Instruments**
 2. **Select the "Logging" template**
@@ -288,7 +288,7 @@ func performNetworkRequest() async {
 
 ```swift
 import SwiftUI
-import Logger
+import Telescopium
 
 struct ContentView: View {
     @State private var logs: [LogEntry] = []
@@ -427,7 +427,7 @@ func exportDebugLogs() {
 
 **Q: Build errors with LogStore**
 - A: Ensure your minimum deployment target is iOS 15.0+
-- A: Import both `OSLog` and `Logger` modules
+- A: Import both `OSLog` and `Telescopium` modules
 
 **Q: Tests failing in CI/CD**
 - A: LogStore requires actual device/simulator, may not work in test environments

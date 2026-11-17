@@ -1,6 +1,6 @@
 import Testing
 import Foundation
-@testable import Logger
+@testable import Telescopium
 
 private final class CaptureExporterStore {
     private var records: [LogRecord] = []
@@ -75,7 +75,7 @@ private struct TestRedactor: LogRedactor {
 }
 
 @Suite(.serialized)
-struct LoggerTests {
+struct TelescopiumTests {
 
 @Test("Logger struct initialization with string category")
 func testLoggerInitWithString() async throws {
