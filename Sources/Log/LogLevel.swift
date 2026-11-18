@@ -12,11 +12,11 @@ public enum LogLevel: CaseIterable, Codable, Identifiable, Sendable {
     case debug
     /// Informational messages
     case info
-    /// Notice messages for significant events
-    case notice
+    /// Warnings about unexpected or recoverable conditions
+    case warning
     /// Error messages for error conditions
     case error
-    /// Fault messages for critical system errors
+    /// Faults indicating a potential bug or violated program invariant
     case fault
 
     public var id: Self { self }
@@ -27,7 +27,7 @@ public enum LogLevel: CaseIterable, Codable, Identifiable, Sendable {
         switch self {
         case .debug: return "DEBUG"
         case .info: return "INFO"
-        case .notice: return "NOTICE"
+        case .warning: return "WARNING"
         case .error: return "ERROR"
         case .fault: return "FAULT"
         }

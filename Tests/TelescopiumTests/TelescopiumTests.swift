@@ -105,7 +105,6 @@ func testLoggerMethods() async throws {
     
     logger.debug("Debug message")
     logger.info("Info message")
-    logger.notice("Notice message")
     logger.error("Error message")
 }
 
@@ -121,10 +120,10 @@ func testLoggerContext() async throws {
 func testLogLevelProperties() async throws {
     #expect(LogLevel.debug.displayName == "DEBUG")
     #expect(LogLevel.info.displayName == "INFO")
-    #expect(LogLevel.notice.displayName == "NOTICE")
+    #expect(LogLevel.warning.displayName == "WARNING")
     #expect(LogLevel.error.displayName == "ERROR")
     #expect(LogLevel.fault.displayName == "FAULT")
-    #expect(LogLevel.allCases == [.debug, .info, .notice, .error, .fault])
+    #expect(LogLevel.allCases == [.debug, .info, .warning, .error, .fault])
     
     // Test Identifiable
     #expect(LogLevel.debug.id == LogLevel.debug)
@@ -182,9 +181,11 @@ func testLoggerPipelineBehavior() async throws {
         LoggerSystem.setup(exporter: exporter)
         
         let logger = Logger(category: "Export")
-        logger.info("Export test")
+        logger.warning("Retrying playback")
         
-        #expect((await waitForRecord(exporter))?.message == "Export test")
+        let record = try #require(await waitForRecord(exporter))
+        #expect(record.level == .warning)
+        #expect(record.message == "Retrying playback")
     }
     
     LoggerSystem.resetForTesting()
@@ -212,9 +213,21 @@ func testLoggerPipelineBehavior() async throws {
         )
         
         let logger = Logger(category: "Redaction")
-        logger.info("Original")
+        logger.fault(
+            "Original",
+            metadata: ["state": "playing"],
+            file: "Playback/Player.swift",
+            function: "play()",
+            line: 42
+        )
         
-        #expect((await waitForRecord(exporter))?.message == "Original_redacted")
+        let record = try #require(await waitForRecord(exporter))
+        #expect(record.message == "Original_redacted")
+        #expect(record.level == .fault)
+        #expect(record.metadata == ["state": "playing"])
+        #expect(record.file == "Playback/Player.swift")
+        #expect(record.function == "play()")
+        #expect(record.line == 42)
     }
     
     LoggerSystem.resetForTesting()

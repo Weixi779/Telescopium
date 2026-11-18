@@ -77,8 +77,9 @@ import Telescopium
 let logger = Logger()
 logger.debug("App started")
 logger.info("User logged in successfully") 
-logger.notice("Network connection established")
+logger.warning("Playback timed out, retrying")
 logger.error("Failed to load data: \(error)")
+logger.fault("Player entered the playing state without a current item")
 
 // Instance interface (for custom categories)
 let networkLogger = Logger(category: "Network")
@@ -193,9 +194,9 @@ logger.event("checkpoint_reached", "Processing 50% complete")
 |---------|-------------|-------------|
 | `debug` | Detailed debugging information | Not persisted in Release |
 | `info`  | General informational messages | Persisted |
-| `notice` | Significant events (not errors) | Persisted |
+| `warning` | Unexpected or recoverable conditions | Persisted as `error` in Apple unified logging |
 | `error` | Error conditions and failures | Persisted |
-| `fault` | Critical system errors | Always persisted |
+| `fault` | Potential bugs, such as a violated program invariant | Persisted |
 
 ## Categories
 

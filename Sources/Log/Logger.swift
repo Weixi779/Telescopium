@@ -90,21 +90,15 @@ public struct Logger: @unchecked Sendable {
         emitRecord(level: .debug, msg: msg, metadata: metadata, file: file, function: function, line: line)
     }
 
-    /// Logs a notice message for significant events that are not errors.
-    /// - Parameters:
-    ///   - msg: The message to log
-    ///   - metadata: Optional key-value pairs attached to the log record
-    ///   - file: The file where the log is called (automatically captured)
-    ///   - function: The function where the log is called (automatically captured)
-    ///   - line: The line number where the log is called (automatically captured)
-    public func notice(
+    /// Logs a warning about an unexpected or recoverable condition.
+    public func warning(
         _ msg: String,
         metadata: [String: String] = [:],
         file: StaticString = #fileID,
         function: StaticString = #function,
         line: Int = #line
     ) {
-        emitRecord(level: .notice, msg: msg, metadata: metadata, file: file, function: function, line: line)
+        emitRecord(level: .warning, msg: msg, metadata: metadata, file: file, function: function, line: line)
     }
 
     /// Logs an error message for error conditions and failures.
@@ -122,6 +116,17 @@ public struct Logger: @unchecked Sendable {
         line: Int = #line
     ) {
         emitRecord(level: .error, msg: msg, metadata: metadata, file: file, function: function, line: line)
+    }
+
+    /// Logs a potential bug, such as a violated program invariant.
+    public func fault(
+        _ msg: String,
+        metadata: [String: String] = [:],
+        file: StaticString = #fileID,
+        function: StaticString = #function,
+        line: Int = #line
+    ) {
+        emitRecord(level: .fault, msg: msg, metadata: metadata, file: file, function: function, line: line)
     }
     
     // MARK: - Timer/Performance Measurement

@@ -165,9 +165,7 @@ private struct LocalLogSink {
             logger.debug("\(message, privacy: .private)")
         case .info:
             logger.info("\(message, privacy: .private)")
-        case .notice:
-            logger.notice("\(message, privacy: .private)")
-        case .error:
+        case .warning, .error:
             logger.error("\(message, privacy: .private)")
         case .fault:
             logger.fault("\(message, privacy: .private)")
