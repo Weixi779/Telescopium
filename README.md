@@ -78,7 +78,7 @@ let logger = Logger()
 logger.debug("App started")
 logger.info("User logged in successfully") 
 logger.warning("Playback timed out, retrying")
-logger.error("Failed to load data: \(error)")
+logger.error("Failed to load data", error: error)
 logger.fault("Player entered the playing state without a current item")
 
 // Instance interface (for custom categories)
@@ -274,7 +274,7 @@ func performNetworkRequest() async {
         logger.info("API request completed successfully")
         return result
     } catch {
-        logger.error("API request failed: \(error)")
+        logger.error("API request failed", error: error)
         throw error
     }
 }
@@ -318,7 +318,7 @@ struct DebugMenu: View {
 let logger = Logger()
 logger.debug("Entering function with parameters: \(params)")  // Development only
 logger.info("User completed onboarding")                       // Important events  
-logger.error("Network request failed: \(error)")              // Actionable errors
+logger.error("Network request failed", error: error)          // Actionable errors
 
 // ❌ Avoid
 logger.info("Loop iteration \(i)")                            // Too verbose

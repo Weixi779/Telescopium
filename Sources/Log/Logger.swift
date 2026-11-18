@@ -43,10 +43,12 @@ public struct Logger: @unchecked Sendable {
     private func emitRecord(
         level: LogLevel,
         msg: String,
+        error: (any Error)?,
         metadata: [String: Any],
         file: StaticString,
         function: StaticString,
-        line: Int
+        line: Int,
+        column: Int
     ) {
         let record = LogRecord(
             timestamp: Date(),
@@ -54,9 +56,13 @@ public struct Logger: @unchecked Sendable {
             category: category,
             subsystem: Self.subsystem,
             message: msg,
-            file: String(describing: file),
-            function: String(describing: function),
-            line: line,
+            location: LogSourceLocation(
+                fileID: String(describing: file),
+                function: String(describing: function),
+                line: line,
+                column: column
+            ),
+            error: error.map(LogErrorInfo.init),
             metadata: defaultMetadata.merging(overrides: Metadata(converting: metadata))
         )
         LoggerSystem.emit(record)
@@ -65,74 +71,135 @@ public struct Logger: @unchecked Sendable {
     /// Logs an informational message.
     /// - Parameters:
     ///   - msg: The message to log
+    ///   - error: An optional error to capture with this record
     ///   - metadata: Optional key-value pairs attached to the log record
     ///   - file: The file where the log is called (automatically captured)
     ///   - function: The function where the log is called (automatically captured)
     ///   - line: The line number where the log is called (automatically captured)
+    ///   - column: The column where the log is called (automatically captured)
     public func info(
         _ msg: String,
+        error: (any Error)? = nil,
         metadata: [String: Any] = [:],
         file: StaticString = #fileID,
         function: StaticString = #function,
-        line: Int = #line
+        line: Int = #line,
+        column: Int = #column
     ) {
-        emitRecord(level: .info, msg: msg, metadata: metadata, file: file, function: function, line: line)
+        emitRecord(
+            level: .info,
+            msg: msg,
+            error: error,
+            metadata: metadata,
+            file: file,
+            function: function,
+            line: line,
+            column: column
+        )
     }
 
     /// Logs a debug message. Debug logs are typically not persisted in release builds.
     /// - Parameters:
     ///   - msg: The message to log
+    ///   - error: An optional error to capture with this record
     ///   - metadata: Optional key-value pairs attached to the log record
     ///   - file: The file where the log is called (automatically captured)
     ///   - function: The function where the log is called (automatically captured)
     ///   - line: The line number where the log is called (automatically captured)
+    ///   - column: The column where the log is called (automatically captured)
     public func debug(
         _ msg: String,
+        error: (any Error)? = nil,
         metadata: [String: Any] = [:],
         file: StaticString = #fileID,
         function: StaticString = #function,
-        line: Int = #line
+        line: Int = #line,
+        column: Int = #column
     ) {
-        emitRecord(level: .debug, msg: msg, metadata: metadata, file: file, function: function, line: line)
+        emitRecord(
+            level: .debug,
+            msg: msg,
+            error: error,
+            metadata: metadata,
+            file: file,
+            function: function,
+            line: line,
+            column: column
+        )
     }
 
     /// Logs a warning about an unexpected or recoverable condition.
     public func warning(
         _ msg: String,
+        error: (any Error)? = nil,
         metadata: [String: Any] = [:],
         file: StaticString = #fileID,
         function: StaticString = #function,
-        line: Int = #line
+        line: Int = #line,
+        column: Int = #column
     ) {
-        emitRecord(level: .warning, msg: msg, metadata: metadata, file: file, function: function, line: line)
+        emitRecord(
+            level: .warning,
+            msg: msg,
+            error: error,
+            metadata: metadata,
+            file: file,
+            function: function,
+            line: line,
+            column: column
+        )
     }
 
     /// Logs an error message for error conditions and failures.
     /// - Parameters:
     ///   - msg: The message to log
+    ///   - error: An optional error to capture with this record
     ///   - metadata: Optional key-value pairs attached to the log record
     ///   - file: The file where the log is called (automatically captured)
     ///   - function: The function where the log is called (automatically captured)
     ///   - line: The line number where the log is called (automatically captured)
+    ///   - column: The column where the log is called (automatically captured)
     public func error(
         _ msg: String,
+        error: (any Error)? = nil,
         metadata: [String: Any] = [:],
         file: StaticString = #fileID,
         function: StaticString = #function,
-        line: Int = #line
+        line: Int = #line,
+        column: Int = #column
     ) {
-        emitRecord(level: .error, msg: msg, metadata: metadata, file: file, function: function, line: line)
+        emitRecord(
+            level: .error,
+            msg: msg,
+            error: error,
+            metadata: metadata,
+            file: file,
+            function: function,
+            line: line,
+            column: column
+        )
     }
 
     /// Logs a potential bug, such as a violated program invariant.
     public func fault(
         _ msg: String,
+        error: (any Error)? = nil,
         metadata: [String: Any] = [:],
         file: StaticString = #fileID,
         function: StaticString = #function,
-        line: Int = #line
+        line: Int = #line,
+        column: Int = #column
     ) {
-        emitRecord(level: .fault, msg: msg, metadata: metadata, file: file, function: function, line: line)
+        emitRecord(
+            level: .fault,
+            msg: msg,
+            error: error,
+            metadata: metadata,
+            file: file,
+            function: function,
+            line: line,
+            column: column
+        )
     }
     
     // MARK: - Timer/Performance Measurement

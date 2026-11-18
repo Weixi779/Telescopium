@@ -109,11 +109,37 @@ func testLoggerMethods() async throws {
 }
 
 
-@Test("Logger context formatting")
-func testLoggerContext() async throws {
-    let logger = Logger(category: "Test")
-    
-    logger.info("Test message")
+@Test("A warning captures its caller and error through redaction and export")
+func testRecordContext() throws {
+    LoggerSystem.resetForTesting()
+    defer { LoggerSystem.resetForTesting() }
+    let exporter = CaptureExporter()
+    LoggerSystem.setup(exporter: exporter, redactors: [TestRedactor(suffix: "_redacted")])
+    let logger = Logger(category: "Playback")
+    let timeout = URLError(.timedOut)
+    // Keep both calls on one line to verify that their columns distinguish them.
+    let line = #line + 1
+    logger.warning("Retry", error: timeout, metadata: ["attempt": 2]); logger.error("Playback stopped")
+
+    let records = exporter.store.allRecords()
+    try #require(records.count == 2)
+    let retry = records[0]
+    #expect(retry.level == .warning)
+    #expect(retry.message == "Retry_redacted")
+    #expect(retry.metadata == ["attempt": 2])
+    #expect(retry.location.fileID == #fileID)
+    #expect(retry.location.function == #function)
+    #expect(retry.location.line == line)
+    #expect(records[1].location.line == line)
+    #expect(retry.location.column > 0)
+    #expect(records[1].location.column > retry.location.column)
+    #expect(retry.error == LogErrorInfo(timeout))
+    #expect(records[1].error == nil)
+
+    let data = try JSONEncoder().encode(retry)
+    let decoded = try JSONDecoder().decode(LogRecord.self, from: data)
+    #expect(decoded.location == retry.location)
+    #expect(decoded.error == retry.error)
 }
 
 @Test("Logger measure method")
@@ -248,16 +274,15 @@ func testLoggerPipelineBehavior() async throws {
             metadata: ["state": "playing"],
             file: "Playback/Player.swift",
             function: "play()",
-            line: 42
+            line: 42,
+            column: 13
         )
         
         let record = try #require(await waitForRecord(exporter))
         #expect(record.message == "Original_redacted")
         #expect(record.level == .fault)
         #expect(record.metadata == ["state": "playing"])
-        #expect(record.file == "Playback/Player.swift")
-        #expect(record.function == "play()")
-        #expect(record.line == 42)
+        #expect(record.location == .init(fileID: "Playback/Player.swift", function: "play()", line: 42, column: 13))
     }
     
     LoggerSystem.resetForTesting()

@@ -158,7 +158,11 @@ private final class Locked<Value>: @unchecked Sendable {
 private struct LocalLogSink {
     func emit(_ record: LogRecord) {
         let logger = os.Logger(subsystem: record.subsystem, category: record.category)
-        let message = "\(record.message)\n\(context(record))"
+        var message = record.message
+        if let error = record.error {
+            message += "\n\(error.typeName): \(error.message)"
+        }
+        message += "\n\(context(record.location))"
         
         switch record.level {
         case .debug:
@@ -172,7 +176,7 @@ private struct LocalLogSink {
         }
     }
     
-    private func context(_ record: LogRecord) -> String {
-        "[\(record.file):\(record.line)] \(record.function)"
+    private func context(_ location: LogSourceLocation) -> String {
+        "[\(location.fileID):\(location.line):\(location.column)] \(location.function)"
     }
 }

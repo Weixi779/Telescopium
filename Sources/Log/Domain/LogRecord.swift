@@ -15,9 +15,8 @@ public struct LogRecord: Sendable, Codable {
     public let category: String
     public let subsystem: String
     public let message: String
-    public let file: String
-    public let function: String
-    public let line: Int
+    public let location: LogSourceLocation
+    public let error: LogErrorInfo?
     public let metadata: Metadata
     
     public init(
@@ -26,9 +25,8 @@ public struct LogRecord: Sendable, Codable {
         category: String,
         subsystem: String,
         message: String,
-        file: String,
-        function: String,
-        line: Int,
+        location: LogSourceLocation,
+        error: LogErrorInfo? = nil,
         metadata: Metadata
     ) {
         self.timestamp = timestamp
@@ -36,9 +34,8 @@ public struct LogRecord: Sendable, Codable {
         self.category = category
         self.subsystem = subsystem
         self.message = message
-        self.file = file
-        self.function = function
-        self.line = line
+        self.location = location
+        self.error = error
         self.metadata = metadata
     }
     
@@ -52,9 +49,8 @@ public struct LogRecord: Sendable, Codable {
             category: category,
             subsystem: subsystem,
             message: message ?? self.message,
-            file: file,
-            function: function,
-            line: line,
+            location: location,
+            error: error,
             metadata: metadata ?? self.metadata
         )
     }
