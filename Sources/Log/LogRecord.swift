@@ -1,3 +1,11 @@
+//
+//  LogRecord.swift
+//  Telescopium
+//
+//  Created by weixi on 2026/01/04.
+//  Copyright © 2026 Telescopium.
+//
+
 import Foundation
 
 /// A structured log record for forwarding to external sinks.
@@ -34,8 +42,10 @@ public struct LogRecord: Sendable {
         self.metadata = metadata
     }
     
-    public func replacing(message: String? = nil,
-                          metadata: [String: String]? = nil) -> LogRecord {
+    public func replacing(
+        message: String? = nil,
+        metadata: [String: String]? = nil
+    ) -> LogRecord {
         LogRecord(
             timestamp: timestamp,
             level: level,

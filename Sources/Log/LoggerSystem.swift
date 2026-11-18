@@ -1,3 +1,11 @@
+//
+//  LoggerSystem.swift
+//  Telescopium
+//
+//  Created by weixi on 2026/04/27.
+//  Copyright © 2026 Telescopium.
+//
+
 import Foundation
 import os
 
@@ -8,8 +16,10 @@ public enum LoggerSystem {
     /// Sets up optional global log processing.
     ///
     /// Local logging is always enabled. Setup replaces the current redactors and exporters.
-    public static func setup(exporters: [LogExporter] = [],
-                             redactors: [LogRedactor] = []) {
+    public static func setup(
+        exporters: [LogExporter] = [],
+        redactors: [LogRedactor] = []
+    ) {
         engine.setup(
             exporters: exporters,
             redactors: redactors
@@ -17,8 +27,10 @@ public enum LoggerSystem {
     }
     
     /// Convenience setup for the common single-exporter case.
-    public static func setup(exporter: LogExporter,
-                             redactors: [LogRedactor] = []) {
+    public static func setup(
+        exporter: LogExporter,
+        redactors: [LogRedactor] = []
+    ) {
         setup(exporters: [exporter], redactors: redactors)
     }
     
@@ -61,8 +73,10 @@ private final class LogSystemEngine: @unchecked Sendable {
     private let state = Locked(LogSystemState())
     private let localSink = LocalLogSink()
     
-    func setup(exporters: [LogExporter],
-               redactors: [LogRedactor]) {
+    func setup(
+        exporters: [LogExporter],
+        redactors: [LogRedactor]
+    ) {
         state.withValue {
             $0.exporters = exporters
             $0.redactors = redactors
@@ -149,7 +163,7 @@ private struct LocalLogSink {
         switch record.level {
         case .debug:
             logger.debug("\(message, privacy: .private)")
-        case .info, .all:
+        case .info:
             logger.info("\(message, privacy: .private)")
         case .notice:
             logger.notice("\(message, privacy: .private)")

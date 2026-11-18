@@ -1,3 +1,11 @@
+//
+//  Logger.swift
+//  Telescopium
+//
+//  Created by weixi on 2025/09/05.
+//  Copyright © 2026 Telescopium.
+//
+
 import os
 import OSLog
 import Foundation
@@ -26,12 +34,14 @@ public struct Logger: @unchecked Sendable {
         return trimmed.isEmpty ? defaultCategory : trimmed
     }
     
-    private func emitRecord(level: LogLevel,
-                            msg: String,
-                            metadata: [String: String],
-                            file: StaticString,
-                            function: StaticString,
-                            line: Int) {
+    private func emitRecord(
+        level: LogLevel,
+        msg: String,
+        metadata: [String: String],
+        file: StaticString,
+        function: StaticString,
+        line: Int
+    ) {
         let record = LogRecord(
             timestamp: Date(),
             level: level,
@@ -53,11 +63,13 @@ public struct Logger: @unchecked Sendable {
     ///   - file: The file where the log is called (automatically captured)
     ///   - function: The function where the log is called (automatically captured)
     ///   - line: The line number where the log is called (automatically captured)
-    public func info(_ msg: String,
-                     metadata: [String: String] = [:],
-                     file: StaticString = #fileID,
-                     function: StaticString = #function,
-                     line: Int = #line) {
+    public func info(
+        _ msg: String,
+        metadata: [String: String] = [:],
+        file: StaticString = #fileID,
+        function: StaticString = #function,
+        line: Int = #line
+    ) {
         emitRecord(level: .info, msg: msg, metadata: metadata, file: file, function: function, line: line)
     }
 
@@ -68,11 +80,13 @@ public struct Logger: @unchecked Sendable {
     ///   - file: The file where the log is called (automatically captured)
     ///   - function: The function where the log is called (automatically captured)
     ///   - line: The line number where the log is called (automatically captured)
-    public func debug(_ msg: String,
-                      metadata: [String: String] = [:],
-                      file: StaticString = #fileID,
-                      function: StaticString = #function,
-                      line: Int = #line) {
+    public func debug(
+        _ msg: String,
+        metadata: [String: String] = [:],
+        file: StaticString = #fileID,
+        function: StaticString = #function,
+        line: Int = #line
+    ) {
         emitRecord(level: .debug, msg: msg, metadata: metadata, file: file, function: function, line: line)
     }
 
@@ -83,11 +97,13 @@ public struct Logger: @unchecked Sendable {
     ///   - file: The file where the log is called (automatically captured)
     ///   - function: The function where the log is called (automatically captured)
     ///   - line: The line number where the log is called (automatically captured)
-    public func notice(_ msg: String,
-                       metadata: [String: String] = [:],
-                       file: StaticString = #fileID,
-                       function: StaticString = #function,
-                       line: Int = #line) {
+    public func notice(
+        _ msg: String,
+        metadata: [String: String] = [:],
+        file: StaticString = #fileID,
+        function: StaticString = #function,
+        line: Int = #line
+    ) {
         emitRecord(level: .notice, msg: msg, metadata: metadata, file: file, function: function, line: line)
     }
 
@@ -98,11 +114,13 @@ public struct Logger: @unchecked Sendable {
     ///   - file: The file where the log is called (automatically captured)
     ///   - function: The function where the log is called (automatically captured)
     ///   - line: The line number where the log is called (automatically captured)
-    public func error(_ msg: String,
-                      metadata: [String: String] = [:],
-                      file: StaticString = #fileID,
-                      function: StaticString = #function,
-                      line: Int = #line) {
+    public func error(
+        _ msg: String,
+        metadata: [String: String] = [:],
+        file: StaticString = #fileID,
+        function: StaticString = #function,
+        line: Int = #line
+    ) {
         emitRecord(level: .error, msg: msg, metadata: metadata, file: file, function: function, line: line)
     }
     

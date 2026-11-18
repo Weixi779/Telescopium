@@ -1,3 +1,11 @@
+//
+//  TelescopiumTests.swift
+//  Telescopium
+//
+//  Created by weixi on 2025/09/05.
+//  Copyright © 2026 Telescopium.
+//
+
 import Testing
 import Foundation
 @testable import Telescopium
@@ -46,9 +54,11 @@ private final class CaptureExporter: LogExporter {
     }
 }
 
-private func waitForRecord(_ exporter: CaptureExporter,
-                           attempts: Int = 100,
-                           delayNanoseconds: UInt64 = 10_000_000) async -> LogRecord? {
+private func waitForRecord(
+    _ exporter: CaptureExporter,
+    attempts: Int = 100,
+    delayNanoseconds: UInt64 = 10_000_000
+) async -> LogRecord? {
     await Task.yield()
     for _ in 0..<attempts {
         if let record = await exporter.firstRecord() {
@@ -107,17 +117,6 @@ func testLoggerContext() async throws {
     logger.info("Test message")
 }
 
-@Test("LogStore initialization")
-func testLogStoreInit() async throws {
-    do {
-        let _ = try LogStore()
-        // LogStore created successfully
-    } catch {
-        // LogStore might fail in test environment without proper log data
-        print("LogStore init failed in test: \(error)")
-    }
-}
-
 @Test("LogLevel enum properties")
 func testLogLevelProperties() async throws {
     #expect(LogLevel.debug.displayName == "DEBUG")
@@ -125,19 +124,11 @@ func testLogLevelProperties() async throws {
     #expect(LogLevel.notice.displayName == "NOTICE")
     #expect(LogLevel.error.displayName == "ERROR")
     #expect(LogLevel.fault.displayName == "FAULT")
-    #expect(LogLevel.all.displayName == "ALL")
+    #expect(LogLevel.allCases == [.debug, .info, .notice, .error, .fault])
     
     // Test Identifiable
     #expect(LogLevel.debug.id == LogLevel.debug)
     #expect(LogLevel.info.id == LogLevel.info)
-}
-
-@Test("LogLevel from OSLog conversion")
-func testLogLevelConversion() async throws {
-    #expect(LogLevel.from(.debug) == .debug)
-    #expect(LogLevel.from(.info) == .info)
-    #expect(LogLevel.from(.error) == .error)
-    #expect(LogLevel.from(.fault) == .fault)
 }
 
 @Test("Logger measure method")

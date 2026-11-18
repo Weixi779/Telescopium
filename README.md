@@ -6,7 +6,7 @@ A comprehensive Swift logging library built on Apple's unified logging system wi
 
 - 🪵 **Structured Logging** - Built on `os.Logger` with automatic source context
 - ⚡ **Performance Measurement** - Integrated `OSSignposter` for timing operations  
-- 📊 **Log Export** - Retrieve and export logs using `OSLogStore`
+- 📊 **Log Export** - Forward structured records to a host-provided `LogExporter`
 - 🎯 **Category-Based Loggers** - Create loggers per feature or component
 - 🔒 **Privacy-Aware** - Automatic privacy protection for log messages
 - 🧵 **Thread-Safe** - Safe for concurrent use across multiple threads
@@ -95,11 +95,14 @@ featureLogger.debug("Connection established")
 import Telescopium
 
 let logger = Logger(category: "Auth")
-logger.info("Login succeeded", metadata: [
-    "userId": "1234",
-    "traceId": "abc123",
-    "spanId": "def456"
-])
+logger.info(
+    "Login succeeded",
+    metadata: [
+        "userId": "1234",
+        "traceId": "abc123",
+        "spanId": "def456"
+    ]
+)
 ```
 
 ### Setup Logger System (Optional)
@@ -184,35 +187,6 @@ logger.endInterval("complex_operation", state: state)
 logger.event("checkpoint_reached", "Processing 50% complete")
 ```
 
-### Log Export & Analysis
-
-```swift
-import Telescopium
-
-// Export logs for debug analysis
-do {
-    let logger = Logger()
-    let logStore = try LogStore()
-    
-    // Get logs from last hour
-    let since = Date().addingTimeInterval(-3600)
-    let logs = try logStore.getLogs(since: since, levels: [.error, .fault])
-    
-    // Export as JSON for programmatic processing
-    let jsonData = try logStore.exportLogsAsJSON(since: since)
-    
-    // Export as text for human reading
-    let textData = try logStore.exportLogsAsText(since: since)
-    
-    // Share or save logs
-    let activityVC = UIActivityViewController(activityItems: [textData], applicationActivities: nil)
-    present(activityVC, animated: true)
-    
-} catch {
-    Logger().error("Failed to export logs: \(error)")
-}
-```
-
 ## Log Levels
 
 | Level   | Description | Persistence |
@@ -261,25 +235,6 @@ Timeline: Your App Process
 
 ## Advanced Usage
 
-### Filtering Logs
-
-```swift
-let logStore = try LogStore()
-
-// Filter by time range and levels
-let errorLogs = try logStore.getLogs(
-    since: Date().addingTimeInterval(-86400), // Last 24 hours
-    until: Date(),
-    levels: [.error, .fault]
-)
-
-// Export specific categories (system automatically filters by subsystem)
-let jsonLogs = try logStore.exportLogsAsJSON(
-    since: startTime,
-    levels: [.info, .notice, .error]
-)
-```
-
 ### Async/Await Support
 
 ```swift
@@ -320,51 +275,6 @@ func performNetworkRequest() async {
 ```
 
 ## Integration Examples
-
-### SwiftUI Integration
-
-```swift
-import SwiftUI
-import Telescopium
-
-struct ContentView: View {
-    @State private var logs: [LogEntry] = []
-    private let logger = Logger()
-    
-    var body: some View {
-        NavigationView {
-            List(logs, id: \.timestamp) { entry in
-                LogRowView(entry: entry)
-            }
-            .navigationTitle("Debug Logs")
-            .toolbar {
-                Button("Export") {
-                    exportLogs()
-                }
-            }
-        }
-        .task {
-            loadLogs()
-        }
-    }
-    
-    private func loadLogs() {
-        Task {
-            do {
-                let logStore = try LogStore()
-                let since = Date().addingTimeInterval(-3600) // Last hour
-                logs = try logStore.getLogs(since: since)
-            } catch {
-                logger.error("Failed to load logs: \(error)")
-            }
-        }
-    }
-    
-    private func exportLogs() {
-        // Implementation for exporting logs
-    }
-}
-```
 
 ### Debug Menu Integration
 
@@ -434,41 +344,13 @@ let sum = logger.measure("addition") {
 }
 ```
 
-### 4. Handle Export Errors Gracefully
-```swift
-// ✅ Good
-func exportDebugLogs() {
-    do {
-        let logStore = try LogStore()
-        let logs = try logStore.exportLogsAsText(since: yesterday)
-        shareDebugInfo(logs)
-    } catch {
-        // Fallback: create manual debug info
-        let fallbackInfo = createFallbackDebugInfo()
-        shareDebugInfo(fallbackInfo)
-    }
-}
-```
-
 ## Troubleshooting
 
 ### Common Issues
 
-**Q: Logs not appearing in export**
-- A: Ensure you're using the correct time range and log levels
-- A: Check that logs were created with the same subsystem (bundle identifier)
-
 **Q: Performance measurements not showing in Instruments**  
 - A: Make sure you're using the Logging template in Instruments
 - A: Verify signposts are enabled in the Instruments settings
-
-**Q: Build errors with LogStore**
-- A: Ensure your minimum deployment target is iOS 15.0+
-- A: Import both `OSLog` and `Telescopium` modules
-
-**Q: Tests failing in CI/CD**
-- A: LogStore requires actual device/simulator, may not work in test environments
-- A: Use conditional compilation for testing environments
 
 ### Debug Tips
 
