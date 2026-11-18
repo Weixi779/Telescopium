@@ -20,13 +20,19 @@ public struct Logger: @unchecked Sendable {
     private let signposter: OSSignposter
     private let category: String
 
-    /// Creates a Logger instance with a custom category string.
-    /// - Parameter category: The category name for this logger instance
-    public init(category: String = Logger.defaultCategory) {
+    /// Metadata applied to every record from this logger.
+    private let defaultMetadata: Metadata
+
+    /// Creates a logger whose default fields can be overridden per record.
+    public init(
+        category: String = Logger.defaultCategory,
+        metadata: [String: Any] = [:]
+    ) {
         let normalizedCategory = Logger.normalizedCategory(category)
         let signpostLogger = os.Logger(subsystem: Self.subsystem, category: normalizedCategory)
         self.signposter = OSSignposter(logger: signpostLogger)
         self.category = normalizedCategory
+        self.defaultMetadata = Metadata(converting: metadata)
     }
 
     private static func normalizedCategory(_ category: String) -> String {
@@ -37,7 +43,7 @@ public struct Logger: @unchecked Sendable {
     private func emitRecord(
         level: LogLevel,
         msg: String,
-        metadata: [String: String],
+        metadata: [String: Any],
         file: StaticString,
         function: StaticString,
         line: Int
@@ -51,7 +57,7 @@ public struct Logger: @unchecked Sendable {
             file: String(describing: file),
             function: String(describing: function),
             line: line,
-            metadata: metadata
+            metadata: defaultMetadata.merging(overrides: Metadata(converting: metadata))
         )
         LoggerSystem.emit(record)
     }
@@ -65,7 +71,7 @@ public struct Logger: @unchecked Sendable {
     ///   - line: The line number where the log is called (automatically captured)
     public func info(
         _ msg: String,
-        metadata: [String: String] = [:],
+        metadata: [String: Any] = [:],
         file: StaticString = #fileID,
         function: StaticString = #function,
         line: Int = #line
@@ -82,7 +88,7 @@ public struct Logger: @unchecked Sendable {
     ///   - line: The line number where the log is called (automatically captured)
     public func debug(
         _ msg: String,
-        metadata: [String: String] = [:],
+        metadata: [String: Any] = [:],
         file: StaticString = #fileID,
         function: StaticString = #function,
         line: Int = #line
@@ -93,7 +99,7 @@ public struct Logger: @unchecked Sendable {
     /// Logs a warning about an unexpected or recoverable condition.
     public func warning(
         _ msg: String,
-        metadata: [String: String] = [:],
+        metadata: [String: Any] = [:],
         file: StaticString = #fileID,
         function: StaticString = #function,
         line: Int = #line
@@ -110,7 +116,7 @@ public struct Logger: @unchecked Sendable {
     ///   - line: The line number where the log is called (automatically captured)
     public func error(
         _ msg: String,
-        metadata: [String: String] = [:],
+        metadata: [String: Any] = [:],
         file: StaticString = #fileID,
         function: StaticString = #function,
         line: Int = #line
@@ -121,7 +127,7 @@ public struct Logger: @unchecked Sendable {
     /// Logs a potential bug, such as a violated program invariant.
     public func fault(
         _ msg: String,
-        metadata: [String: String] = [:],
+        metadata: [String: Any] = [:],
         file: StaticString = #fileID,
         function: StaticString = #function,
         line: Int = #line

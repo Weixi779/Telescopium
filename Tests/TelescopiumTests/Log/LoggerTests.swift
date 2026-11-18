@@ -1,5 +1,5 @@
 //
-//  TelescopiumTests.swift
+//  LoggerTests.swift
 //  Telescopium
 //
 //  Created by weixi on 2025/09/05.
@@ -85,7 +85,7 @@ private struct TestRedactor: LogRedactor {
 }
 
 @Suite(.serialized)
-struct TelescopiumTests {
+struct LoggerTests {
 
 @Test("Logger struct initialization with string category")
 func testLoggerInitWithString() async throws {
@@ -169,6 +169,50 @@ func testLoggerEvent() async throws {
     
     logger.event("test_event")
     logger.event("test_event_with_message", "This is a test message")
+}
+
+@Test("Metadata overrides apply to one record from one logger")
+func testRecordMetadataOverrides() throws {
+    LoggerSystem.resetForTesting()
+    defer { LoggerSystem.resetForTesting() }
+
+    let exporter = CaptureExporter()
+    LoggerSystem.setup(exporter: exporter, redactors: [TestRedactor(suffix: "_redacted")])
+    let defaults: [String: Any] = [
+        "module": "Playback",
+        "source": "app",
+        "route": ["host": "primary", "port": 443],
+        "codes": [1, 2]
+    ]
+    let logger = Logger(category: "Playback", metadata: defaults)
+    let itemID = "episode-123"
+    let attempt = 2
+    logger.warning(
+        "Retry",
+        metadata: [
+            "itemID": itemID, "attempt": attempt, "source": NSNull(),
+            "route": ["host": "fallback"], "codes": [], "invalid": Date()
+        ]
+    )
+    logger.info("Ready")
+    Logger(category: "Playback").debug("Separate logger")
+
+    let records = exporter.store.allRecords()
+    try #require(records.count == 3)
+    let retry = records[0]
+    let expected: Metadata = [
+        "module": "Playback", "itemID": "episode-123", "attempt": 2, "source": .null,
+        "route": ["host": "fallback"], "codes": []
+    ]
+    #expect(retry.message == "Retry_redacted")
+    #expect(retry.metadata == expected)
+    #expect(records[1].metadata == [
+        "module": "Playback", "source": "app", "route": ["host": "primary", "port": 443], "codes": [1, 2]
+    ])
+    #expect(records[2].metadata.isEmpty)
+    let data = try JSONEncoder().encode(retry)
+    #expect(try JSONDecoder().decode(LogRecord.self, from: data).metadata == expected)
+    #expect(retry.replacing(metadata: ["masked": true]).metadata == ["masked": true])
 }
 
 @Test("Logger pipeline behavior")

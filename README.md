@@ -95,16 +95,21 @@ featureLogger.debug("Connection established")
 ```swift
 import Telescopium
 
-let logger = Logger(category: "Auth")
+let logger = Logger(
+    category: "Auth",
+    metadata: ["module": "Auth", "source": "app"]
+)
 logger.info(
     "Login succeeded",
     metadata: [
         "userId": "1234",
-        "traceId": "abc123",
-        "spanId": "def456"
+        "source": "web",
+        "attempts": [["status": 200, "duration": 1.0]]
     ]
 )
 ```
+
+Each record inherits the logger's metadata. A call overrides matching top-level keys for that record, including entire objects and arrays. Pass Swift variables and existing dictionaries directly as `[String: Any]`. Use `NSNull()` or `MetadataValue.null` for an explicit null. The logger normalizes fields to `MetadataValue` before redaction and export. It skips unsupported values (including out-of-range unsigned integers and Decimal), keeps other fields and array elements in order, and reports the skipped location in debug builds.
 
 ### Setup Logger System (Optional)
 
@@ -150,7 +155,7 @@ struct MaskingRedactor: LogRedactor {
     let policy: RedactionPolicy = .always
     
     func redact(_ record: LogRecord) -> LogRecord {
-        let masked = record.metadata.mapValues { _ in "***" }
+        let masked: Metadata = record.metadata.mapValues { _ in "***" }
         return record.replacing(metadata: masked)
     }
 }

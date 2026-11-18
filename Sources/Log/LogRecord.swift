@@ -9,7 +9,7 @@
 import Foundation
 
 /// A structured log record for forwarding to external sinks.
-public struct LogRecord: Sendable {
+public struct LogRecord: Sendable, Codable {
     public let timestamp: Date
     public let level: LogLevel
     public let category: String
@@ -18,7 +18,7 @@ public struct LogRecord: Sendable {
     public let file: String
     public let function: String
     public let line: Int
-    public let metadata: [String: String]
+    public let metadata: Metadata
     
     public init(
         timestamp: Date,
@@ -29,7 +29,7 @@ public struct LogRecord: Sendable {
         file: String,
         function: String,
         line: Int,
-        metadata: [String: String]
+        metadata: Metadata
     ) {
         self.timestamp = timestamp
         self.level = level
@@ -44,7 +44,7 @@ public struct LogRecord: Sendable {
     
     public func replacing(
         message: String? = nil,
-        metadata: [String: String]? = nil
+        metadata: Metadata? = nil
     ) -> LogRecord {
         LogRecord(
             timestamp: timestamp,
