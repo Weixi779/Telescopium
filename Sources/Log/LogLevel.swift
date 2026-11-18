@@ -7,7 +7,7 @@
 //
 
 /// The severity of a log record.
-public enum LogLevel: CaseIterable, Codable, Identifiable, Sendable {
+public enum LogLevel: String, CaseIterable, Codable, Hashable, Sendable {
     /// Debug messages (typically not persisted in release builds)
     case debug
     /// Informational messages
@@ -18,18 +18,29 @@ public enum LogLevel: CaseIterable, Codable, Identifiable, Sendable {
     case error
     /// Faults indicating a potential bug or violated program invariant
     case fault
+}
 
-    public var id: Self { self }
+extension LogLevel: LosslessStringConvertible {
+    public var description: String { rawValue }
 
-    /// Human-readable display name for the log level.
-    /// - Returns: Uppercase string representation of the log level
-    public var displayName: String {
+    /// Parses a log level name case-insensitively.
+    public init?(_ description: String) {
+        self.init(rawValue: description.lowercased())
+    }
+}
+
+extension LogLevel: Comparable {
+    private var severityOrder: Int {
         switch self {
-        case .debug: return "DEBUG"
-        case .info: return "INFO"
-        case .warning: return "WARNING"
-        case .error: return "ERROR"
-        case .fault: return "FAULT"
+        case .debug: 0
+        case .info: 1
+        case .warning: 2
+        case .error: 3
+        case .fault: 4
         }
+    }
+
+    public static func < (lhs: Self, rhs: Self) -> Bool {
+        lhs.severityOrder < rhs.severityOrder
     }
 }

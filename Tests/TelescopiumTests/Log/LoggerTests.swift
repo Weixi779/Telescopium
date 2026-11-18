@@ -116,20 +116,6 @@ func testLoggerContext() async throws {
     logger.info("Test message")
 }
 
-@Test("LogLevel enum properties")
-func testLogLevelProperties() async throws {
-    #expect(LogLevel.debug.displayName == "DEBUG")
-    #expect(LogLevel.info.displayName == "INFO")
-    #expect(LogLevel.warning.displayName == "WARNING")
-    #expect(LogLevel.error.displayName == "ERROR")
-    #expect(LogLevel.fault.displayName == "FAULT")
-    #expect(LogLevel.allCases == [.debug, .info, .warning, .error, .fault])
-    
-    // Test Identifiable
-    #expect(LogLevel.debug.id == LogLevel.debug)
-    #expect(LogLevel.info.id == LogLevel.info)
-}
-
 @Test("Logger measure method")
 func testLoggerMeasure() async throws {
     let logger = Logger(category: "TestTimer")
