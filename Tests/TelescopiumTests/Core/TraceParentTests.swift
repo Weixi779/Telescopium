@@ -26,57 +26,72 @@ struct TraceParentTests {
         #expect(Set([parent, parent]).count == 1)
     }
 
-    @Test("Identifier boundaries retain leading zeros", arguments: [
-        "00000000000000000000000000000001",
-        "00000000000000010000000000000000",
-        "ffffffffffffffffffffffffffffffff"
-    ])
+    @Test(
+        "Identifier boundaries retain leading zeros",
+        arguments: [
+            "00000000000000000000000000000001",
+            "00000000000000010000000000000000",
+            "ffffffffffffffffffffffffffffffff"
+        ]
+    )
     func traceBoundaries(_ string: String) throws {
         let id = try #require(TraceId(hexString: string))
         #expect(id.hexString == string)
     }
 
-    @Test("Span boundaries retain leading zeros", arguments: [
-        "0000000000000001", "ffffffffffffffff"
-    ])
+    @Test(
+        "Span boundaries retain leading zeros",
+        arguments: [
+            "0000000000000001", "ffffffffffffffff"
+        ]
+    )
     func spanBoundaries(_ string: String) throws {
         let id = try #require(SpanId(hexString: string))
         #expect(id.hexString == string)
     }
 
-    @Test("Invalid trace identifiers are rejected", arguments: [
-        "", "00000000000000000000000000000000",
-        "4BF92F3577B34DA6A3CE929D0E0E4736",
-        "gbf92f3577b34da6a3ce929d0e0e4736",
-        "4bf92f3577b34da6a3ce929d0e0e473",
-        "04bf92f3577b34da6a3ce929d0e0e4736",
-        "4bf92f3577b34da6a3ce929d0e0e473 ",
-        "é000000000000000000000000000000"
-    ])
+    @Test(
+        "Invalid trace identifiers are rejected",
+        arguments: [
+            "", "00000000000000000000000000000000",
+            "4BF92F3577B34DA6A3CE929D0E0E4736",
+            "gbf92f3577b34da6a3ce929d0e0e4736",
+            "4bf92f3577b34da6a3ce929d0e0e473",
+            "04bf92f3577b34da6a3ce929d0e0e4736",
+            "4bf92f3577b34da6a3ce929d0e0e473 ",
+            "é000000000000000000000000000000"
+        ]
+    )
     func invalidTrace(_ string: String) {
         #expect(TraceId(hexString: string) == nil)
     }
 
-    @Test("Invalid span identifiers are rejected", arguments: [
-        "", "0000000000000000", "00F067AA0BA902B7", "g0f067aa0ba902b7",
-        "0f067aa0ba902b7", "000f067aa0ba902b7", "00f067aa0ba902b ",
-        "é00000000000000"
-    ])
+    @Test(
+        "Invalid span identifiers are rejected",
+        arguments: [
+            "", "0000000000000000", "00F067AA0BA902B7", "g0f067aa0ba902b7",
+            "0f067aa0ba902b7", "000f067aa0ba902b7", "00f067aa0ba902b ",
+            "é00000000000000"
+        ]
+    )
     func invalidSpan(_ string: String) {
         #expect(SpanId(hexString: string) == nil)
     }
 
-    @Test("Malformed or unsupported headers are rejected", arguments: [
-        "", "01-\(trace)-\(span)-01", "ff-\(trace)-\(span)-01",
-        "00-00000000000000000000000000000000-\(span)-01",
-        "00-\(trace)-0000000000000000-01",
-        "00-\(trace.uppercased())-\(span)-01",
-        "00-\(trace)-\(span.uppercased())-01",
-        "00-\(trace)-\(span)-0A", "00-\(trace)-\(span)-gg",
-        "00-\(trace)-\(span)-1", "00-\(trace)-\(span)-001",
-        "00-\(trace)-\(span)-01-extra", " \(header)", "\(header)\n",
-        "00_\(trace)-\(span)-01", "00-\(trace)--01"
-    ])
+    @Test(
+        "Malformed or unsupported headers are rejected",
+        arguments: [
+            "", "01-\(trace)-\(span)-01", "ff-\(trace)-\(span)-01",
+            "00-00000000000000000000000000000000-\(span)-01",
+            "00-\(trace)-0000000000000000-01",
+            "00-\(trace.uppercased())-\(span)-01",
+            "00-\(trace)-\(span.uppercased())-01",
+            "00-\(trace)-\(span)-0A", "00-\(trace)-\(span)-gg",
+            "00-\(trace)-\(span)-1", "00-\(trace)-\(span)-001",
+            "00-\(trace)-\(span)-01-extra", " \(header)", "\(header)\n",
+            "00_\(trace)-\(span)-01", "00-\(trace)--01"
+        ]
+    )
     func invalidHeader(_ string: String) {
         #expect(TraceParent(headerValue: string) == nil)
     }

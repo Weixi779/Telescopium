@@ -84,11 +84,13 @@ struct BaggageTests {
     func codingRoundTrip() throws {
         let metadata = Baggage.Metadata(rawValue: "  source=ios;custom=💼  ")
         let entry = Baggage.Entry(value: "B% 💼,;=", metadata: metadata)
-        let baggage = Baggage(entries: [
-            "业务": entry,
-            "empty": .init(value: ""),
-            "emptyMetadata": .init(value: "x", metadata: .init(rawValue: ""))
-        ])
+        let baggage = Baggage(
+            entries: [
+                "业务": entry,
+                "empty": .init(value: ""),
+                "emptyMetadata": .init(value: "x", metadata: .init(rawValue: ""))
+            ]
+        )
         try roundTrip(baggage)
         try roundTrip(Baggage())
         try roundTrip(entry)
@@ -100,11 +102,14 @@ struct BaggageTests {
         #expect(decoded["workflow"] == .init(value: "import", metadata: .init(rawValue: "source=ios")))
     }
 
-    @Test("Codable rejects values outside the string-based model", arguments: [
-        #"{"entries":{"key":{"value":42}}}"#,
-        #"{"entries":{"key":{}}}"#,
-        #"{"entries":{"key":{"value":"x","metadata":{"rawValue":true}}}}"#
-    ])
+    @Test(
+        "Codable rejects values outside the string-based model",
+        arguments: [
+            #"{"entries":{"key":{"value":42}}}"#,
+            #"{"entries":{"key":{}}}"#,
+            #"{"entries":{"key":{"value":"x","metadata":{"rawValue":true}}}}"#
+        ]
+    )
     func invalidCoding(_ json: String) {
         #expect(throws: DecodingError.self) {
             try JSONDecoder().decode(Baggage.self, from: Data(json.utf8))
