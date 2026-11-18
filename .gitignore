@@ -62,3 +62,9 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# Local reference snapshots
+/.references/
+
+# CodeGraph index and runtime state
+/.codegraph/
