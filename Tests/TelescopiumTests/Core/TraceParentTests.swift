@@ -1,5 +1,5 @@
 //
-//  CoreTests.swift
+//  TraceParentTests.swift
 //  Telescopium
 //
 //  Created by weixi on 2026/11/17.
@@ -10,7 +10,7 @@ import Foundation
 import Testing
 import Telescopium
 
-struct CoreTests {
+struct TraceParentTests {
     private static let trace = "4bf92f3577b34da6a3ce929d0e0e4736"
     private static let span = "00f067aa0ba902b7"
     private static let header = "00-\(trace)-\(span)-01"
