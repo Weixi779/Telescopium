@@ -7,7 +7,7 @@
 //
 
 /// Controls when a redactor is applied.
-public enum RedactionPolicy {
+public enum RedactionPolicy: Sendable {
     case never
     case always
     case when(@Sendable () -> Bool)
@@ -25,9 +25,9 @@ public enum RedactionPolicy {
 }
 
 /// Scrubs sensitive data from log records.
-public protocol LogRedactor {
+public protocol LogRedactor: Sendable {
     var policy: RedactionPolicy { get }
-    /// Returns the record passed to subsequent redactors, local logging, and exporters.
+    /// May be called concurrently. Returns the record passed to subsequent redactors and sinks.
     func redact(_ record: LogRecord) -> LogRecord
 }
 

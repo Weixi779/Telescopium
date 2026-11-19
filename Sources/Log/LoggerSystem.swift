@@ -6,7 +6,6 @@
 //  Copyright © 2026 Telescopium.
 //
 
-import Foundation
 import os
 
 /// Global entry point for the logging system.
@@ -69,46 +68,46 @@ public enum LoggerSystem {
     #endif
 }
 
-private final class LogSystemEngine: @unchecked Sendable {
-    private let state = Locked(LogSystemState())
+private final class LogSystemEngine: Sendable {
+    private let state = LockedValue(LogSystemState())
     private let localSink = LocalLogSink()
     
     func setup(
         exporters: [LogExporter],
         redactors: [LogRedactor]
     ) {
-        state.withValue {
+        state.withLock {
             $0.exporters = exporters
             $0.redactors = redactors
         }
     }
     
     func addExporters(_ exporters: [LogExporter]) {
-        state.withValue {
+        state.withLock {
             $0.exporters.append(contentsOf: exporters)
         }
     }
     
     func addRedactors(_ redactors: [LogRedactor]) {
-        state.withValue {
+        state.withLock {
             $0.redactors.append(contentsOf: redactors)
         }
     }
     
     func removeAllExporters() {
-        state.withValue {
+        state.withLock {
             $0.exporters.removeAll()
         }
     }
     
     func removeAllRedactors() {
-        state.withValue {
+        state.withLock {
             $0.redactors.removeAll()
         }
     }
     
     func emit(_ record: LogRecord) {
-        let components = state.read { $0 }
+        let components = state.withLock { $0 }
         var output = record
         for redactor in components.redactors where redactor.policy.shouldRedact() {
             output = redactor.redact(output)
@@ -122,37 +121,16 @@ private final class LogSystemEngine: @unchecked Sendable {
 
     #if DEBUG
     func resetForTesting() {
-        state.withValue {
+        state.withLock {
             $0 = LogSystemState()
         }
     }
     #endif
 }
 
-private struct LogSystemState {
+private struct LogSystemState: Sendable {
     var exporters: [LogExporter] = []
     var redactors: [LogRedactor] = []
-}
-
-private final class Locked<Value>: @unchecked Sendable {
-    private var value: Value
-    private let lock = NSLock()
-    
-    init(_ value: Value) {
-        self.value = value
-    }
-    
-    func read<T>(_ body: (Value) -> T) -> T {
-        lock.lock()
-        defer { lock.unlock() }
-        return body(value)
-    }
-    
-    func withValue<T>(_ body: (inout Value) -> T) -> T {
-        lock.lock()
-        defer { lock.unlock() }
-        return body(&value)
-    }
 }
 
 private struct LocalLogSink {

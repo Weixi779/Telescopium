@@ -10,23 +10,23 @@ import Testing
 import Foundation
 @testable import Telescopium
 
-private final class CaptureExporterStore {
-    private var records: [LogRecord] = []
+private final class CaptureExporterStore: Sendable {
+    private let records = LockedValue<[LogRecord]>([])
     
     func append(_ record: LogRecord) {
-        records.append(record)
+        records.withLock { $0.append(record) }
     }
     
     func firstRecord() -> LogRecord? {
-        records.first
+        records.withLock { $0.first }
     }
     
     func recordCount() -> Int {
-        records.count
+        records.withLock { $0.count }
     }
     
     func allRecords() -> [LogRecord] {
-        records
+        records.withLock { $0 }
     }
 }
 

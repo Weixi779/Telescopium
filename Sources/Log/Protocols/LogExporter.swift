@@ -7,7 +7,7 @@
 //
 
 /// Receives each record after the configured redactors have run.
-public protocol LogExporter {
+public protocol LogExporter: Sendable {
     /// Called synchronously on the logging caller's thread, potentially from multiple threads at once.
     func export(_ record: LogRecord)
 }
