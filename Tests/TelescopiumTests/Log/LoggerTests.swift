@@ -111,8 +111,8 @@ func testLoggerMethods() async throws {
 
 @Test("A warning captures its caller and error through redaction and export")
 func testRecordContext() throws {
-    LoggerSystem.resetForTesting()
-    defer { LoggerSystem.resetForTesting() }
+    LoggerSystem.setup()
+    defer { LoggerSystem.setup() }
     let exporter = CaptureExporter()
     LoggerSystem.setup(exporter: exporter, redactors: [TestRedactor(suffix: "_redacted")])
     let logger = Logger(category: "Playback")
@@ -185,8 +185,8 @@ func testLoggerEvent() async throws {
 
 @Test("Metadata overrides apply to one record from one logger")
 func testRecordMetadataOverrides() throws {
-    LoggerSystem.resetForTesting()
-    defer { LoggerSystem.resetForTesting() }
+    LoggerSystem.setup()
+    defer { LoggerSystem.setup() }
 
     let exporter = CaptureExporter()
     LoggerSystem.setup(exporter: exporter, redactors: [TestRedactor(suffix: "_redacted")])
@@ -227,10 +227,36 @@ func testRecordMetadataOverrides() throws {
     #expect(retry.replacing(metadata: ["masked": true]).metadata == ["masked": true])
 }
 
+@Test("Changing redactors preserves the selected exporters until they are explicitly replaced")
+func testExporterConfiguration() {
+    LoggerSystem.setup()
+    defer { LoggerSystem.setup() }
+    let logger = Logger(category: "Playback")
+    let first = CaptureExporter()
+    let second = CaptureExporter()
+    let redactor = TestRedactor(suffix: "_redacted")
+
+    LoggerSystem.addExporter(first)
+    LoggerSystem.setup(redactors: [redactor])
+    logger.info("First")
+    LoggerSystem.setup(exporter: second)
+    logger.info("Second")
+    LoggerSystem.setup(exporters: [])
+    LoggerSystem.setup(redactors: [redactor])
+    logger.info("Disabled")
+    LoggerSystem.addExporter(first)
+    logger.info("Resumed")
+    LoggerSystem.setup()
+    logger.info("Restored")
+
+    #expect(first.store.allRecords().map(\.message) == ["First_redacted", "Resumed_redacted"])
+    #expect(second.store.allRecords().map(\.message) == ["Second"])
+}
+
 @Test("Logger pipeline behavior")
 func testLoggerPipelineBehavior() async throws {
-    LoggerSystem.resetForTesting()
-    defer { LoggerSystem.resetForTesting() }
+    LoggerSystem.setup()
+    defer { LoggerSystem.setup() }
     
     do {
         let exporter = CaptureExporter()
@@ -244,7 +270,7 @@ func testLoggerPipelineBehavior() async throws {
         #expect(record.message == "Retrying playback")
     }
     
-    LoggerSystem.resetForTesting()
+    LoggerSystem.setup()
     do {
         let exporter = CaptureExporter()
         let redactor = TestRedactor(suffix: "_redacted", policy: .never)
@@ -259,7 +285,7 @@ func testLoggerPipelineBehavior() async throws {
         #expect((await waitForRecord(exporter))?.message == "Original")
     }
     
-    LoggerSystem.resetForTesting()
+    LoggerSystem.setup()
     do {
         let exporter = CaptureExporter()
         let redactor = TestRedactor(suffix: "_redacted", policy: .always)
@@ -285,7 +311,7 @@ func testLoggerPipelineBehavior() async throws {
         #expect(record.location == .init(fileID: "Playback/Player.swift", function: "play()", line: 42, column: 13))
     }
     
-    LoggerSystem.resetForTesting()
+    LoggerSystem.setup()
     do {
         let exporter = CaptureExporter()
         LoggerSystem.setup(exporter: exporter)
@@ -296,7 +322,7 @@ func testLoggerPipelineBehavior() async throws {
         #expect((await waitForRecord(exporter))?.category == Logger.defaultCategory)
     }
     
-    LoggerSystem.resetForTesting()
+    LoggerSystem.setup()
     do {
         let firstExporter = CaptureExporter()
         let secondExporter = CaptureExporter()
@@ -315,7 +341,7 @@ func testLoggerPipelineBehavior() async throws {
         #expect((await waitForRecord(secondExporter))?.message == "Multiple_one_two")
     }
     
-    LoggerSystem.resetForTesting()
+    LoggerSystem.setup()
     do {
         let firstExporter = CaptureExporter()
         let secondExporter = CaptureExporter()

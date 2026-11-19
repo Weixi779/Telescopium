@@ -6,23 +6,21 @@
 //  Copyright © 2026 Telescopium.
 //
 
-import os
-
 /// Global entry point for the logging system.
 public enum LoggerSystem {
     private static let engine = LogSystemEngine()
     
-    /// Sets up optional global log processing.
-    ///
-    /// Local logging is always enabled. Setup replaces the current redactors and exporters.
+    /// Restores the default OS log exporter and clears the redactors.
+    public static func setup() {
+        engine.setup(LogSystemState())
+    }
+
+    /// Replaces the current exporters and redactors. Pass an empty exporter list to disable output.
     public static func setup(
-        exporters: [LogExporter] = [],
+        exporters: [LogExporter],
         redactors: [LogRedactor] = []
     ) {
-        engine.setup(
-            exporters: exporters,
-            redactors: redactors
-        )
+        engine.setup(LogSystemState(exporters: exporters, redactors: redactors))
     }
     
     /// Convenience setup for the common single-exporter case.
@@ -31,6 +29,11 @@ public enum LoggerSystem {
         redactors: [LogRedactor] = []
     ) {
         setup(exporters: [exporter], redactors: redactors)
+    }
+
+    /// Replaces the redactors while preserving the current exporters.
+    public static func setup(redactors: [LogRedactor]) {
+        engine.setRedactors(redactors)
     }
     
     public static func addExporter(_ exporter: LogExporter) {
@@ -60,26 +63,17 @@ public enum LoggerSystem {
     static func emit(_ record: LogRecord) {
         engine.emit(record)
     }
-
-    #if DEBUG
-    static func resetForTesting() {
-        engine.resetForTesting()
-    }
-    #endif
 }
 
 private final class LogSystemEngine: Sendable {
     private let state = LockedValue(LogSystemState())
-    private let localSink = LocalLogSink()
     
-    func setup(
-        exporters: [LogExporter],
-        redactors: [LogRedactor]
-    ) {
-        state.withLock {
-            $0.exporters = exporters
-            $0.redactors = redactors
-        }
+    func setup(_ configuration: LogSystemState) {
+        state.withLock { $0 = configuration }
+    }
+
+    func setRedactors(_ redactors: [LogRedactor]) {
+        state.withLock { $0.redactors = redactors }
     }
     
     func addExporters(_ exporters: [LogExporter]) {
@@ -113,48 +107,13 @@ private final class LogSystemEngine: Sendable {
             output = redactor.redact(output)
         }
         
-        localSink.emit(output)
         for exporter in components.exporters {
             exporter.export(output)
         }
     }
-
-    #if DEBUG
-    func resetForTesting() {
-        state.withLock {
-            $0 = LogSystemState()
-        }
-    }
-    #endif
 }
 
 private struct LogSystemState: Sendable {
-    var exporters: [LogExporter] = []
+    var exporters: [LogExporter] = [OSLogExporter()]
     var redactors: [LogRedactor] = []
-}
-
-private struct LocalLogSink {
-    func emit(_ record: LogRecord) {
-        let logger = os.Logger(subsystem: record.subsystem, category: record.category)
-        var message = record.message
-        if let error = record.error {
-            message += "\n\(error.typeName): \(error.message)"
-        }
-        message += "\n\(context(record.location))"
-        
-        switch record.level {
-        case .debug:
-            logger.debug("\(message, privacy: .private)")
-        case .info:
-            logger.info("\(message, privacy: .private)")
-        case .warning, .error:
-            logger.error("\(message, privacy: .private)")
-        case .fault:
-            logger.fault("\(message, privacy: .private)")
-        }
-    }
-    
-    private func context(_ location: LogSourceLocation) -> String {
-        "[\(location.fileID):\(location.line):\(location.column)] \(location.function)"
-    }
 }

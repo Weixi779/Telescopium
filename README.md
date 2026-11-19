@@ -135,21 +135,17 @@ final class TokenRedactor: LogRedactor {
 }
 
 LoggerSystem.setup(
-    exporters: [RemoteExporter()],
+    exporters: [OSLogExporter(), RemoteExporter()],
     redactors: [TokenRedactor()]
 )
 ```
 
-`setup` can be called again to replace the current exporters and redactors. Use `addExporter`, `addRedactor`, `removeAllExporters`, and `removeAllRedactors` for runtime changes.
+The default exporter is `OSLogExporter()`. Use `LoggerSystem.addExporter(_:)` to append another output. An explicit `setup(exporters:redactors:)` replaces both lists. Pass `exporters: []` or call `removeAllExporters()` to disable all output. Call `setup()` to restore the default exporter and clear the redactors.
 
 ### Redaction-Only Example
 
 ```swift
 import Telescopium
-
-struct NoOpExporter: LogExporter {
-    func export(_ record: LogRecord) {}
-}
 
 struct MaskingRedactor: LogRedactor {
     let policy: RedactionPolicy = .always
@@ -160,10 +156,8 @@ struct MaskingRedactor: LogRedactor {
     }
 }
 
-LoggerSystem.setup(
-    exporter: NoOpExporter(),
-    redactors: [MaskingRedactor()]
-)
+// Update redaction for the current exporters.
+LoggerSystem.setup(redactors: [MaskingRedactor()])
 ```
 
 ### Performance Measurement
