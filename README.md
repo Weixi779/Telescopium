@@ -10,13 +10,12 @@ A Swift library for structured logging and performance measurement. Logs go to A
 - 🎯 **Category-Based Loggers** - Create loggers per feature or component
 - 🔒 **Privacy-Aware** - Apply redactors before export. The default OS exporter marks messages as private.
 - 🧵 **Thread-Safe** - Safe for concurrent use across multiple threads
-- 📱 **iOS 15+** - Modern iOS, macOS, tvOS, and watchOS support
+- 📱 **iOS 16+** - iOS, macOS, tvOS, and watchOS support
 
 ## Requirements
 
-- **iOS 15.0+** / **macOS 12.0+** / **tvOS 15.0+** / **watchOS 8.0+**
-- Swift 5.9+
-- Xcode 15.0+
+- **iOS 16.0+** / **macOS 13.0+** / **tvOS 16.0+** / **watchOS 9.0+**
+- Swift tools 6.2+ (Xcode 26+)
 
 ## Installation
 
