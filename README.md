@@ -151,6 +151,69 @@ Each log call reads the current application recorder. Registering a replacement 
 
 With no registration, the application uses `LogRecorder()`, which exports to `OSLogExporter`. Register `LogRecorder(exporters: [])` to silence application logging, or register `LogRecorder()` to restore the default output.
 
+### OpenTelemetry and Datadog
+
+The base `Telescopium` product has no vendor target dependencies. Enable the package trait for each destination and link its library product in the consuming target. Both traits are off by default.
+
+| Package trait | Library product | Dependency used by the exporter |
+| --- | --- | --- |
+| `OpenTelemetry` | `TelescopiumOpenTelemetry` | `OpenTelemetryApi` |
+| `Datadog` | `TelescopiumDatadog` | `DatadogLogs` |
+
+For example, an App package using a local checkout can select both integrations with:
+
+```swift
+// Package dependencies
+.package(path: "../Telescopium", traits: ["OpenTelemetry", "Datadog"])
+
+// App target dependencies
+.product(name: "Telescopium", package: "Telescopium"),
+.product(name: "TelescopiumOpenTelemetry", package: "Telescopium"),
+.product(name: "TelescopiumDatadog", package: "Telescopium")
+```
+
+In a base-only consumer, SwiftPM 6.4 resolves no vendor packages. A Datadog-only consumer builds Datadog Logs and its internal module. SwiftPM also resolves dependencies declared upstream by Datadog, including OTel, even though it doesn't build those modules for logging. In Telescopium's checkout, run `swift test --traits OpenTelemetry,Datadog` to exercise the same Playback record through both SDKs.
+
+```swift
+import Telescopium
+import TelescopiumOpenTelemetry
+import TelescopiumDatadog
+import DatadogCore
+import DatadogLogs
+
+// The App supplies its configured OTel LoggerProvider, Datadog configuration and consent.
+let core = Datadog.initialize(with: datadogConfiguration, trackingConsent: consent)
+Logs.enable(in: core)
+let ddLogger = DatadogLogs.Logger.create(with: .init(name: "Telescopium"), in: core)
+
+Log.register(
+    recorder: LogRecorder(
+        redactors: [TokenRedactor()],
+        exporters: [
+            OSLogExporter(),
+            OTelLogExporter(provider: provider),
+            DatadogLogExporter(logger: ddLogger)
+        ]
+    )
+)
+
+Telescopium.Logger(category: "Playback").warning("Retry playback", metadata: ["attempt": 2])
+```
+
+The OTel exporter uses the category as the instrumentation scope and preserves the record timestamp. Datadog uses the host logger's name and its SDK clock. The adapter also sends the category, subsystem, original epoch milliseconds, location and error snapshot in the `telescopium` attribute. The App owns SDK configuration, batching and upload.
+
+Both exporters recursively map metadata after redaction. The table shows how to query the resulting fields.
+
+| Metadata value | OpenTelemetry attribute | Datadog JSON |
+| --- | --- | --- |
+| Object / array | Attribute set / ordered array | Object / ordered array |
+| Boolean / string / finite number | Corresponding typed value | Corresponding JSON value |
+| Null | String `"null"`, including inside arrays | JSON `null` |
+| Bytes | Base64 string | Base64 string |
+| NaN / positive or negative infinity | Double | String `"NaN"`, `"Infinity"` or `"-Infinity"` |
+
+The OTel Swift API has no native null or bytes case. These string encodings preserve array positions but are indistinguishable from matching user strings. On platforms with a 32-bit `Int`, OTel receives out-of-range integers as decimal strings. Datadog receives the full `Int64`. The adapters reserve their source and error fields when they add record context.
+
 ### Redaction-Only Example
 
 ```swift
