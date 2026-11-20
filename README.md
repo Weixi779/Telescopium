@@ -1,14 +1,14 @@
 # Telescopium
 
-A comprehensive Swift logging library built on Apple's unified logging system with performance measurement and log export capabilities.
+A Swift library for structured logging and performance measurement. Logs go to Apple's unified logging system by default.
 
 ## Features
 
-- 🪵 **Structured Logging** - Built on `os.Logger` with automatic source context
+- 🪵 **Structured Logging** - Capture each message, its metadata, and its source location in a `LogRecord`
 - ⚡ **Performance Measurement** - Integrated `OSSignposter` for timing operations  
 - 📊 **Log Export** - Forward structured records to a host-provided `LogExporter`
 - 🎯 **Category-Based Loggers** - Create loggers per feature or component
-- 🔒 **Privacy-Aware** - Automatic privacy protection for log messages
+- 🔒 **Privacy-Aware** - Apply redactors before export. The default OS exporter marks messages as private.
 - 🧵 **Thread-Safe** - Safe for concurrent use across multiple threads
 - 📱 **iOS 15+** - Modern iOS, macOS, tvOS, and watchOS support
 
@@ -111,9 +111,10 @@ logger.info(
 
 Each record inherits the logger's metadata. A call overrides matching top-level keys for that record, including entire objects and arrays. Pass Swift variables and existing dictionaries directly as `[String: Any]`. Use `NSNull()` or `MetadataValue.null` for an explicit null. The logger normalizes fields to `MetadataValue` before redaction and export. It skips unsupported values (including out-of-range unsigned integers and Decimal), keeps other fields and array elements in order, and reports the skipped location in debug builds.
 
-### Setup Logger System (Optional)
+### Register an Application Recorder
 
 ```swift
+import Foundation
 import Telescopium
 
 /// Example exporter. Replace with your own OTLP/HTTP implementation.
@@ -134,13 +135,22 @@ final class TokenRedactor: LogRedactor {
     }
 }
 
-LoggerSystem.setup(
-    exporters: [OSLogExporter(), RemoteExporter()],
-    redactors: [TokenRedactor()]
+// App startup
+Log.register(
+    recorder: LogRecorder(
+        redactors: [TokenRedactor()],
+        exporters: [OSLogExporter(), RemoteExporter()]
+    )
 )
+
+// Playback
+let logger = Logger(category: "Playback")
+logger.info("Play tapped")
 ```
 
-The default exporter is `OSLogExporter()`. Use `LoggerSystem.addExporter(_:)` to append another output. An explicit `setup(exporters:redactors:)` replaces both lists. Pass `exporters: []` or call `removeAllExporters()` to disable all output. Call `setup()` to restore the default exporter and clear the redactors.
+Each log call reads the current application recorder. Registering a replacement also affects loggers created before registration. A record already handed to the previous recorder finishes there. A logger created with `Logger(category: "Playback", recorder: recorder)` uses that recorder for its lifetime.
+
+With no registration, the application uses `LogRecorder()`, which exports to `OSLogExporter`. Register `LogRecorder(exporters: [])` to silence application logging, or register `LogRecorder()` to restore the default output.
 
 ### Redaction-Only Example
 
@@ -156,8 +166,8 @@ struct MaskingRedactor: LogRedactor {
     }
 }
 
-// Update redaction for the current exporters.
-LoggerSystem.setup(redactors: [MaskingRedactor()])
+// Send masked records to the default OS exporter.
+Log.register(recorder: LogRecorder(redactors: [MaskingRedactor()]))
 ```
 
 ### Performance Measurement

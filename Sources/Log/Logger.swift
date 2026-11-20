@@ -10,29 +10,30 @@ import os
 import OSLog
 import Foundation
 
-/// A logging utility built on top of Apple's unified logging system (os.Logger) with performance measurement capabilities.
-/// 
-/// Logger provides structured logging with automatic source context and performance measurement using OSSignposter.
-/// It supports multiple log levels and can be used for both development debugging and production monitoring.
+/// Creates structured records with source context and measures intervals with OSSignposter.
 public struct Logger: @unchecked Sendable {
     private static let subsystem = Bundle.main.bundleIdentifier ?? "app"
     public static let defaultCategory = "Default"
     private let signposter: OSSignposter
     private let category: String
+    private let explicitRecorder: (any LogRecording)?
 
     /// Metadata applied to every record from this logger.
     private let defaultMetadata: Metadata
 
     /// Creates a logger whose default fields can be overridden per record.
+    /// Supply a recorder to bind it to this logger. Omit it to follow the application recorder on each call.
     public init(
         category: String = Logger.defaultCategory,
-        metadata: [String: Any] = [:]
+        metadata: [String: Any] = [:],
+        recorder: (any LogRecording)? = nil
     ) {
         let normalizedCategory = Logger.normalizedCategory(category)
         let signpostLogger = os.Logger(subsystem: Self.subsystem, category: normalizedCategory)
         self.signposter = OSSignposter(logger: signpostLogger)
         self.category = normalizedCategory
         self.defaultMetadata = Metadata(converting: metadata)
+        self.explicitRecorder = recorder
     }
 
     private static func normalizedCategory(_ category: String) -> String {
@@ -65,7 +66,8 @@ public struct Logger: @unchecked Sendable {
             error: error.map(LogErrorInfo.init),
             metadata: defaultMetadata.merging(overrides: Metadata(converting: metadata))
         )
-        LoggerSystem.emit(record)
+        let recorder = explicitRecorder ?? Log.currentRecorder
+        recorder.record(record)
     }
     
     /// Logs an informational message.

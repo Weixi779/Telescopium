@@ -10,65 +10,25 @@ import Testing
 import Foundation
 @testable import Telescopium
 
-private final class CaptureExporterStore: Sendable {
-    private let records = LockedValue<[LogRecord]>([])
-    
-    func append(_ record: LogRecord) {
-        records.withLock { $0.append(record) }
-    }
-    
-    func firstRecord() -> LogRecord? {
-        records.withLock { $0.first }
-    }
-    
-    func recordCount() -> Int {
-        records.withLock { $0.count }
-    }
-    
-    func allRecords() -> [LogRecord] {
-        records.withLock { $0 }
+private struct CallbackRecorder: LogRecording {
+    let onRecord: @Sendable (LogRecord) -> Void
+
+    func record(_ record: LogRecord) {
+        onRecord(record)
     }
 }
 
 private final class CaptureExporter: LogExporter {
-    let store: CaptureExporterStore
-    
-    init(store: CaptureExporterStore = CaptureExporterStore()) {
-        self.store = store
+    private let storage = LockedValue<[LogRecord]>([])
+
+    var records: [LogRecord] {
+        storage.withLock { $0 }
     }
-    
+
     func export(_ record: LogRecord) {
-        store.append(record)
-    }
-    
-    func firstRecord() async -> LogRecord? {
-        store.firstRecord()
-    }
-    
-    func recordCount() async -> Int {
-        store.recordCount()
-    }
-    
-    func allRecords() async -> [LogRecord] {
-        store.allRecords()
+        storage.withLock { $0.append(record) }
     }
 }
-
-private func waitForRecord(
-    _ exporter: CaptureExporter,
-    attempts: Int = 100,
-    delayNanoseconds: UInt64 = 10_000_000
-) async -> LogRecord? {
-    await Task.yield()
-    for _ in 0..<attempts {
-        if let record = await exporter.firstRecord() {
-            return record
-        }
-        try? await Task.sleep(nanoseconds: delayNanoseconds)
-    }
-    return nil
-}
-
 
 private struct TestRedactor: LogRedactor {
     let suffix: String
@@ -111,17 +71,18 @@ func testLoggerMethods() async throws {
 
 @Test("A warning captures its caller and error through redaction and export")
 func testRecordContext() throws {
-    LoggerSystem.setup()
-    defer { LoggerSystem.setup() }
     let exporter = CaptureExporter()
-    LoggerSystem.setup(exporter: exporter, redactors: [TestRedactor(suffix: "_redacted")])
-    let logger = Logger(category: "Playback")
+    let recorder = LogRecorder(
+        redactors: [TestRedactor(suffix: "_redacted")],
+        exporters: [exporter]
+    )
+    let logger = Logger(category: "Playback", recorder: recorder)
     let timeout = URLError(.timedOut)
     // Keep both calls on one line to verify that their columns distinguish them.
     let line = #line + 1
     logger.warning("Retry", error: timeout, metadata: ["attempt": 2]); logger.error("Playback stopped")
 
-    let records = exporter.store.allRecords()
+    let records = exporter.records
     try #require(records.count == 2)
     let retry = records[0]
     #expect(retry.level == .warning)
@@ -185,18 +146,18 @@ func testLoggerEvent() async throws {
 
 @Test("Metadata overrides apply to one record from one logger")
 func testRecordMetadataOverrides() throws {
-    LoggerSystem.setup()
-    defer { LoggerSystem.setup() }
-
     let exporter = CaptureExporter()
-    LoggerSystem.setup(exporter: exporter, redactors: [TestRedactor(suffix: "_redacted")])
+    let recorder = LogRecorder(
+        redactors: [TestRedactor(suffix: "_redacted")],
+        exporters: [exporter]
+    )
     let defaults: [String: Any] = [
         "module": "Playback",
         "source": "app",
         "route": ["host": "primary", "port": 443],
         "codes": [1, 2]
     ]
-    let logger = Logger(category: "Playback", metadata: defaults)
+    let logger = Logger(category: "Playback", metadata: defaults, recorder: recorder)
     let itemID = "episode-123"
     let attempt = 2
     logger.warning(
@@ -207,9 +168,9 @@ func testRecordMetadataOverrides() throws {
         ]
     )
     logger.info("Ready")
-    Logger(category: "Playback").debug("Separate logger")
+    Logger(category: "Playback", recorder: recorder).debug("Separate logger")
 
-    let records = exporter.store.allRecords()
+    let records = exporter.records
     try #require(records.count == 3)
     let retry = records[0]
     let expected: Metadata = [
@@ -227,150 +188,102 @@ func testRecordMetadataOverrides() throws {
     #expect(retry.replacing(metadata: ["masked": true]).metadata == ["masked": true])
 }
 
-@Test("Changing redactors preserves the selected exporters until they are explicitly replaced")
-func testExporterConfiguration() {
-    LoggerSystem.setup()
-    defer { LoggerSystem.setup() }
-    let logger = Logger(category: "Playback")
+@Test("An existing logger follows registration and an explicitly bound logger keeps its recorder")
+func testRecorderBinding() {
+    let previous = Log.currentRecorder
+    defer { Log.register(recorder: previous) }
+
+    let playback = Logger(category: "Playback")
     let first = CaptureExporter()
     let second = CaptureExporter()
-    let redactor = TestRedactor(suffix: "_redacted")
+    let firstRecorder = LogRecorder(exporters: [first])
+    let fixed = Logger(category: "Playback", recorder: firstRecorder)
 
-    LoggerSystem.addExporter(first)
-    LoggerSystem.setup(redactors: [redactor])
+    Log.register(recorder: firstRecorder)
+    playback.info("Before")
+    Log.register(recorder: LogRecorder(exporters: [second]))
+    playback.info("After")
+    fixed.info("Fixed")
+    Log.register(recorder: LogRecorder(exporters: []))
+    playback.info("Silent")
+    fixed.info("Still fixed")
+
+    #expect(first.records.map(\.message) == ["Before", "Fixed", "Still fixed"])
+    #expect(second.records.map(\.message) == ["After"])
+}
+
+@Test("A replacement can record while a call to the previous recorder is still in progress")
+func testReplaceWhileRecording() throws {
+    let previous = Log.currentRecorder
+    defer { Log.register(recorder: previous) }
+
+    let first = CaptureExporter()
+    let second = CaptureExporter()
+    let entered = DispatchSemaphore(value: 0)
+    let resume = DispatchSemaphore(value: 0)
+    let finished = DispatchSemaphore(value: 0)
+    let logger = Logger(category: "Playback")
+    Log.register(
+        recorder: CallbackRecorder { record in
+            entered.signal()
+            guard resume.wait(timeout: .now() + 5) == .success else {
+                Issue.record("The in-flight call blocked recorder replacement")
+                return
+            }
+            first.export(record)
+        }
+    )
+
+    DispatchQueue.global().async {
+        logger.info("In flight")
+        finished.signal()
+    }
+    defer { resume.signal() }
+    try #require(entered.wait(timeout: .now() + 5) == .success)
+
+    Log.register(recorder: LogRecorder(exporters: [second]))
+    logger.info("After replacement")
+    #expect(second.records.map(\.message) == ["After replacement"])
+    #expect(first.records.isEmpty)
+
+    resume.signal()
+    try #require(finished.wait(timeout: .now() + 5) == .success)
+    #expect(first.records.map(\.message) == ["In flight"])
+}
+
+@Test("Redactors run in order before every exporter and evaluate their policies for each record")
+func testRedactionAndExport() throws {
+    let enabled = LockedValue(false)
+    let first = CaptureExporter()
+    let second = CaptureExporter()
+    let recorder = LogRecorder(
+        redactors: [
+            TestRedactor(suffix: "_skipped", policy: .never),
+            TestRedactor(suffix: "_one"),
+            TestRedactor(suffix: "_two", policy: .when { enabled.withLock { $0 } })
+        ],
+        exporters: [first, second]
+    )
+    let logger = Logger(category: "   ", recorder: recorder)
     logger.info("First")
-    LoggerSystem.setup(exporter: second)
-    logger.info("Second")
-    LoggerSystem.setup(exporters: [])
-    LoggerSystem.setup(redactors: [redactor])
-    logger.info("Disabled")
-    LoggerSystem.addExporter(first)
-    logger.info("Resumed")
-    LoggerSystem.setup()
-    logger.info("Restored")
+    enabled.withLock { $0 = true }
+    logger.fault(
+        "Second",
+        metadata: ["state": "playing"],
+        file: "Playback/Player.swift",
+        function: "play()",
+        line: 42,
+        column: 13
+    )
 
-    #expect(first.store.allRecords().map(\.message) == ["First_redacted", "Resumed_redacted"])
-    #expect(second.store.allRecords().map(\.message) == ["Second"])
+    let records = first.records
+    let messages = ["First_one", "Second_one_two"]
+    #expect(records.map(\.message) == messages)
+    #expect(second.records.map(\.message) == messages)
+    let fault = try #require(records.last)
+    #expect(fault.category == Logger.defaultCategory)
+    #expect(fault.level == .fault)
+    #expect(fault.metadata == ["state": "playing"])
+    #expect(fault.location == .init(fileID: "Playback/Player.swift", function: "play()", line: 42, column: 13))
 }
-
-@Test("Logger pipeline behavior")
-func testLoggerPipelineBehavior() async throws {
-    LoggerSystem.setup()
-    defer { LoggerSystem.setup() }
-    
-    do {
-        let exporter = CaptureExporter()
-        LoggerSystem.setup(exporter: exporter)
-        
-        let logger = Logger(category: "Export")
-        logger.warning("Retrying playback")
-        
-        let record = try #require(await waitForRecord(exporter))
-        #expect(record.level == .warning)
-        #expect(record.message == "Retrying playback")
-    }
-    
-    LoggerSystem.setup()
-    do {
-        let exporter = CaptureExporter()
-        let redactor = TestRedactor(suffix: "_redacted", policy: .never)
-        LoggerSystem.setup(
-            exporter: exporter,
-            redactors: [redactor]
-        )
-        
-        let logger = Logger(category: "Redaction")
-        logger.info("Original")
-        
-        #expect((await waitForRecord(exporter))?.message == "Original")
-    }
-    
-    LoggerSystem.setup()
-    do {
-        let exporter = CaptureExporter()
-        let redactor = TestRedactor(suffix: "_redacted", policy: .always)
-        LoggerSystem.setup(
-            exporter: exporter,
-            redactors: [redactor]
-        )
-        
-        let logger = Logger(category: "Redaction")
-        logger.fault(
-            "Original",
-            metadata: ["state": "playing"],
-            file: "Playback/Player.swift",
-            function: "play()",
-            line: 42,
-            column: 13
-        )
-        
-        let record = try #require(await waitForRecord(exporter))
-        #expect(record.message == "Original_redacted")
-        #expect(record.level == .fault)
-        #expect(record.metadata == ["state": "playing"])
-        #expect(record.location == .init(fileID: "Playback/Player.swift", function: "play()", line: 42, column: 13))
-    }
-    
-    LoggerSystem.setup()
-    do {
-        let exporter = CaptureExporter()
-        LoggerSystem.setup(exporter: exporter)
-        
-        let logger = Logger(category: "   ")
-        logger.info("Default category")
-        
-        #expect((await waitForRecord(exporter))?.category == Logger.defaultCategory)
-    }
-    
-    LoggerSystem.setup()
-    do {
-        let firstExporter = CaptureExporter()
-        let secondExporter = CaptureExporter()
-        let firstRedactor = TestRedactor(suffix: "_one")
-        let secondRedactor = TestRedactor(suffix: "_two")
-        
-        LoggerSystem.setup(
-            exporters: [firstExporter, secondExporter],
-            redactors: [firstRedactor, secondRedactor]
-        )
-        
-        let logger = Logger(category: "Pipeline")
-        logger.info("Multiple")
-        
-        #expect((await waitForRecord(firstExporter))?.message == "Multiple_one_two")
-        #expect((await waitForRecord(secondExporter))?.message == "Multiple_one_two")
-    }
-    
-    LoggerSystem.setup()
-    do {
-        let firstExporter = CaptureExporter()
-        let secondExporter = CaptureExporter()
-        let firstRedactor = TestRedactor(suffix: "_first")
-        let secondRedactor = TestRedactor(suffix: "_second")
-        let logger = Logger(category: "HotSwap")
-        
-        LoggerSystem.setup(exporter: firstExporter)
-        logger.info("Before")
-        
-        LoggerSystem.addRedactor(firstRedactor)
-        LoggerSystem.addExporter(secondExporter)
-        logger.info("After add")
-        
-        LoggerSystem.setup(exporters: [secondExporter], redactors: [secondRedactor])
-        logger.info("After replace")
-        
-        #expect(await firstExporter.recordCount() == 2)
-        #expect(await secondExporter.recordCount() == 2)
-        #expect((await firstExporter.allRecords()).map(\.message) == ["Before", "After add_first"])
-        #expect((await secondExporter.allRecords()).map(\.message) == ["After add_first", "After replace_second"])
-        
-        LoggerSystem.removeAllExporters()
-        LoggerSystem.removeAllRedactors()
-        logger.info("After remove")
-        
-        #expect(await firstExporter.recordCount() == 2)
-        #expect(await secondExporter.recordCount() == 2)
-    }
-}
-
 }
