@@ -442,6 +442,14 @@ if ProcessInfo.processInfo.arguments.contains("--export-logs") {
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
+Install the development tools with `brew install swiftformat swiftlint`. Run these commands from the package root as needed.
+
+```sh
+swiftformat . --lint    # Check formatting
+swiftformat .           # Apply formatting
+swiftlint lint --strict # Check for lint violations
+```
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

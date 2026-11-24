@@ -1,0 +1,27 @@
+# 个人项目的检查集。排版交给 SwiftFormat。
+only_rules:
+  - duplicate_conditions
+  - duplicate_imports
+  - unused_control_flow_label
+  - unused_enumerated
+  - void_function_in_ternary
+  - unused_setter_value
+  - reduce_into
+  - discarded_notification_center_observer
+  - unhandled_throwing_task
+  - custom_rules
+
+custom_rules:
+  empty_private_setup_ui:
+    name: "空的私有 setupUI"
+    regex: '^[ \t]*private[ \t]+func[ \t]+setupUI[ \t]*\([ \t]*\)\s*\{\s*\}'
+    match_kinds: [identifier, keyword, typeidentifier, attribute.builtin]
+    message: "setupUI() 当前为空。确认是否需要这个组装步骤，有意留空时写明原因。"
+    severity: warning
+
+excluded:
+  - "**/.build"
+  - "**/.swiftpm"
+  - "**/DerivedData"
+  - .references
+  - .codegraph

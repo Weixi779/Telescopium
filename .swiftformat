@@ -1,0 +1,20 @@
+# Petrichor formatting rules for this Swift 6 package.
+--min-version 0.61.0
+--swift-version 6.2
+--language-mode 6
+--rules consecutiveBlankLines,indent,linebreakAtEndOfFile,linebreaks,spaceAroundOperators,trailingCommas,trailingSpace,wrapArguments
+
+--indent 4
+--linebreaks lf
+--ifdef preserve
+--ranges preserve
+
+--wrap-arguments before-first
+--wrap-parameters before-first
+--allow-partial-wrapping false
+--closing-paren balanced
+--call-site-paren balanced
+--wrap-collections disabled
+--trailing-commas always
+
+--exclude **/.build,**/.swiftpm,**/DerivedData,.references,.codegraph
