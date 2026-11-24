@@ -34,7 +34,7 @@ public struct LogErrorInfo: Sendable, Codable, Equatable {
             typeName: String(reflecting: errorType),
             message: message,
             domain: nsError?.domain,
-            code: nsError?.code
+            code: nsError?.code,
         )
     }
 }

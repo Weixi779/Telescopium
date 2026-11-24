@@ -36,7 +36,7 @@ final class SpanRecord: Span {
             let traceParent = TraceParent(
                 traceId: parent.traceParent.traceId,
                 spanId: .random(),
-                flags: parent.traceParent.flags
+                flags: parent.traceParent.flags,
             )
             context = SpanContext(traceParent: traceParent, traceState: parent.traceState)
         } else {

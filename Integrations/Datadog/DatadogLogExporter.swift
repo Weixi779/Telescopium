@@ -38,13 +38,13 @@ public struct DatadogLogExporter: LogExporter {
             subsystem: record.subsystem,
             timestampMilliseconds: Int64(exactly: (record.timestamp.timeIntervalSince1970 * 1000).rounded(.down)),
             location: record.location,
-            error: record.error
+            error: record.error,
         )
         logger.log(
             level: record.level.datadogLevel,
             message: record.message,
             error: nil,
-            attributes: attributes
+            attributes: attributes,
         )
     }
 }

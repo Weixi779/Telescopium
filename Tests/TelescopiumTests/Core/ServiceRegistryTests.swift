@@ -52,7 +52,7 @@ struct ServiceRegistryTests {
             instance: ServiceWithCleanup {
                 #expect(registry.resolve(ServiceWithCleanup.self) === replacement)
                 released.signal()
-            }
+            },
         )
 
         DispatchQueue.global().async {

@@ -13,7 +13,7 @@ public struct LogRecorder: LogRecording {
 
     public init(
         redactors: [any LogRedactor] = [],
-        exporters: [any LogExporter] = [OSLogExporter()]
+        exporters: [any LogExporter] = [OSLogExporter()],
     ) {
         self.redactors = redactors
         self.exporters = exporters

@@ -49,7 +49,7 @@ public struct TraceState: Sendable, Hashable, Codable {
         let members = headerValue.split(
             separator: ",",
             maxSplits: Self.maximumMembers,
-            omittingEmptySubsequences: false
+            omittingEmptySubsequences: false,
         )
         guard members.count <= Self.maximumMembers else { return nil }
 

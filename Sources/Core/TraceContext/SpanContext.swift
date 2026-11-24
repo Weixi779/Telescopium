@@ -17,7 +17,7 @@ public struct SpanContext: Sendable, Hashable, Codable {
     public init(
         traceParent: TraceParent,
         traceState: TraceState = TraceState(),
-        isRemote: Bool = false
+        isRemote: Bool = false,
     ) {
         self.traceParent = traceParent
         self.traceState = traceState

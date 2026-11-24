@@ -9,26 +9,26 @@ let package = Package(
         .iOS(.v16),
         .macOS(.v13),
         .tvOS(.v16),
-        .watchOS(.v9)
+        .watchOS(.v9),
     ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: "Telescopium",
-            targets: ["Telescopium"]
+            targets: ["Telescopium"],
         ),
         .library(
             name: "TelescopiumOpenTelemetry",
-            targets: ["TelescopiumOpenTelemetry"]
+            targets: ["TelescopiumOpenTelemetry"],
         ),
         .library(
             name: "TelescopiumDatadog",
-            targets: ["TelescopiumDatadog"]
+            targets: ["TelescopiumDatadog"],
         ),
     ],
     traits: [
         .trait(name: "OpenTelemetry", description: "Enable the OpenTelemetry log exporter."),
-        .trait(name: "Datadog", description: "Enable the Datadog log exporter.")
+        .trait(name: "Datadog", description: "Enable the Datadog log exporter."),
     ],
     dependencies: [
         .package(url: "https://github.com/open-telemetry/opentelemetry-swift-core", from: "2.5.0"),
@@ -39,7 +39,7 @@ let package = Package(
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
             name: "Telescopium",
-            path: "Sources"
+            path: "Sources",
         ),
         .target(
             name: "TelescopiumOpenTelemetry",
@@ -48,10 +48,10 @@ let package = Package(
                 .product(
                     name: "OpenTelemetryApi",
                     package: "opentelemetry-swift-core",
-                    condition: .when(traits: ["OpenTelemetry"])
-                )
+                    condition: .when(traits: ["OpenTelemetry"]),
+                ),
             ],
-            path: "Integrations/OpenTelemetry"
+            path: "Integrations/OpenTelemetry",
         ),
         .target(
             name: "TelescopiumDatadog",
@@ -60,14 +60,14 @@ let package = Package(
                 .product(
                     name: "DatadogLogs",
                     package: "dd-sdk-ios",
-                    condition: .when(traits: ["Datadog"])
-                )
+                    condition: .when(traits: ["Datadog"]),
+                ),
             ],
-            path: "Integrations/Datadog"
+            path: "Integrations/Datadog",
         ),
         .testTarget(
             name: "TelescopiumTests",
-            dependencies: ["Telescopium"]
+            dependencies: ["Telescopium"],
         ),
         .testTarget(
             name: "ExporterIntegrationTests",
@@ -78,24 +78,24 @@ let package = Package(
                 .product(
                     name: "OpenTelemetryApi",
                     package: "opentelemetry-swift-core",
-                    condition: .when(traits: ["OpenTelemetry"])
+                    condition: .when(traits: ["OpenTelemetry"]),
                 ),
                 .product(
                     name: "OpenTelemetrySdk",
                     package: "opentelemetry-swift-core",
-                    condition: .when(traits: ["OpenTelemetry"])
+                    condition: .when(traits: ["OpenTelemetry"]),
                 ),
                 .product(
                     name: "DatadogCore",
                     package: "dd-sdk-ios",
-                    condition: .when(traits: ["Datadog"])
+                    condition: .when(traits: ["Datadog"]),
                 ),
                 .product(
                     name: "DatadogLogs",
                     package: "dd-sdk-ios",
-                    condition: .when(traits: ["Datadog"])
-                )
-            ]
+                    condition: .when(traits: ["Datadog"]),
+                ),
+            ],
         ),
-    ]
+    ],
 )

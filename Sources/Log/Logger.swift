@@ -26,7 +26,7 @@ public struct Logger: @unchecked Sendable {
     public init(
         category: String = Logger.defaultCategory,
         metadata: [String: Any] = [:],
-        recorder: (any LogRecording)? = nil
+        recorder: (any LogRecording)? = nil,
     ) {
         let normalizedCategory = Logger.normalizedCategory(category)
         let signpostLogger = os.Logger(subsystem: Self.subsystem, category: normalizedCategory)
@@ -40,7 +40,7 @@ public struct Logger: @unchecked Sendable {
         let trimmed = category.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? defaultCategory : trimmed
     }
-    
+
     private func emitRecord(
         level: LogLevel,
         msg: String,
@@ -49,7 +49,7 @@ public struct Logger: @unchecked Sendable {
         file: StaticString,
         function: StaticString,
         line: Int,
-        column: Int
+        column: Int,
     ) {
         let record = LogRecord(
             timestamp: Date(),
@@ -61,15 +61,15 @@ public struct Logger: @unchecked Sendable {
                 fileID: String(describing: file),
                 function: String(describing: function),
                 line: line,
-                column: column
+                column: column,
             ),
             error: error.map(LogErrorInfo.init),
-            metadata: defaultMetadata.merging(overrides: Metadata(converting: metadata))
+            metadata: defaultMetadata.merging(overrides: Metadata(converting: metadata)),
         )
         let recorder = explicitRecorder ?? Log.currentRecorder
         recorder.record(record)
     }
-    
+
     /// Logs an informational message.
     /// - Parameters:
     ///   - msg: The message to log
@@ -86,7 +86,7 @@ public struct Logger: @unchecked Sendable {
         file: StaticString = #fileID,
         function: StaticString = #function,
         line: Int = #line,
-        column: Int = #column
+        column: Int = #column,
     ) {
         emitRecord(
             level: .info,
@@ -96,7 +96,7 @@ public struct Logger: @unchecked Sendable {
             file: file,
             function: function,
             line: line,
-            column: column
+            column: column,
         )
     }
 
@@ -116,7 +116,7 @@ public struct Logger: @unchecked Sendable {
         file: StaticString = #fileID,
         function: StaticString = #function,
         line: Int = #line,
-        column: Int = #column
+        column: Int = #column,
     ) {
         emitRecord(
             level: .debug,
@@ -126,7 +126,7 @@ public struct Logger: @unchecked Sendable {
             file: file,
             function: function,
             line: line,
-            column: column
+            column: column,
         )
     }
 
@@ -138,7 +138,7 @@ public struct Logger: @unchecked Sendable {
         file: StaticString = #fileID,
         function: StaticString = #function,
         line: Int = #line,
-        column: Int = #column
+        column: Int = #column,
     ) {
         emitRecord(
             level: .warning,
@@ -148,7 +148,7 @@ public struct Logger: @unchecked Sendable {
             file: file,
             function: function,
             line: line,
-            column: column
+            column: column,
         )
     }
 
@@ -168,7 +168,7 @@ public struct Logger: @unchecked Sendable {
         file: StaticString = #fileID,
         function: StaticString = #function,
         line: Int = #line,
-        column: Int = #column
+        column: Int = #column,
     ) {
         emitRecord(
             level: .error,
@@ -178,7 +178,7 @@ public struct Logger: @unchecked Sendable {
             file: file,
             function: function,
             line: line,
-            column: column
+            column: column,
         )
     }
 
@@ -190,7 +190,7 @@ public struct Logger: @unchecked Sendable {
         file: StaticString = #fileID,
         function: StaticString = #function,
         line: Int = #line,
-        column: Int = #column
+        column: Int = #column,
     ) {
         emitRecord(
             level: .fault,
@@ -200,12 +200,12 @@ public struct Logger: @unchecked Sendable {
             file: file,
             function: function,
             line: line,
-            column: column
+            column: column,
         )
     }
-    
+
     // MARK: - Timer/Performance Measurement
-    
+
     /// Starts a performance measurement interval that can be ended manually.
     /// Use this for complex scenarios where you need fine-grained control over timing.
     /// - Parameter name: A unique name for this measurement interval
@@ -216,7 +216,7 @@ public struct Logger: @unchecked Sendable {
         let state = signposter.beginInterval(name, id: intervalId)
         return state
     }
-    
+
     /// Ends a performance measurement interval started with startInterval().
     /// - Parameters:
     ///   - name: The name of the interval (must exactly match the name used in startInterval)
@@ -224,7 +224,7 @@ public struct Logger: @unchecked Sendable {
     public func endInterval(_ name: StaticString, state: OSSignpostIntervalState) {
         signposter.endInterval(name, state)
     }
-    
+
     /// Measures the execution time of a synchronous closure.
     /// This is the recommended way to measure performance for most use cases.
     /// - Parameters:
@@ -236,16 +236,16 @@ public struct Logger: @unchecked Sendable {
         let intervalId = signposter.makeSignpostID()
         let state = signposter.beginInterval(name, id: intervalId)
         let startTime = CFAbsoluteTimeGetCurrent()
-        
+
         defer {
             let duration = CFAbsoluteTimeGetCurrent() - startTime
             signposter.endInterval(name, state)
             info("📊 \(name) completed in \(String(format: "%.2f", duration * 1000))ms")
         }
-        
+
         return try operation()
     }
-    
+
     /// Measures the execution time of an asynchronous closure.
     /// Perfect for measuring async/await operations and Task execution times.
     /// - Parameters:
@@ -257,16 +257,16 @@ public struct Logger: @unchecked Sendable {
         let intervalId = signposter.makeSignpostID()
         let state = signposter.beginInterval(name, id: intervalId)
         let startTime = CFAbsoluteTimeGetCurrent()
-        
+
         defer {
             let duration = CFAbsoluteTimeGetCurrent() - startTime
             signposter.endInterval(name, state)
             info("📊 \(name) completed in \(String(format: "%.2f", duration * 1000))ms")
         }
-        
+
         return try await operation()
     }
-    
+
     /// Emits an instant signpost event marker.
     /// Useful for marking specific points in time during execution for debugging and profiling.
     /// - Parameters:

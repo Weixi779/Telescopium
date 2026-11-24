@@ -47,7 +47,7 @@ extension MetadataValue: Codable {
         let keys = container.allKeys
         guard keys.count == 1, let tag = keys.first else {
             throw DecodingError.dataCorrupted(
-                .init(codingPath: decoder.codingPath, debugDescription: "Expected one metadata value tag.")
+                .init(codingPath: decoder.codingPath, debugDescription: "Expected one metadata value tag."),
             )
         }
 
@@ -71,7 +71,7 @@ extension MetadataValue: Codable {
                     throw DecodingError.dataCorruptedError(
                         forKey: tag,
                         in: container,
-                        debugDescription: "Unknown nonfinite double spelling."
+                        debugDescription: "Unknown nonfinite double spelling.",
                     )
                 }
             } else {

@@ -18,7 +18,7 @@ public struct LogRecord: Sendable, Codable {
     public let location: LogSourceLocation
     public let error: LogErrorInfo?
     public let metadata: Metadata
-    
+
     public init(
         timestamp: Date,
         level: LogLevel,
@@ -27,7 +27,7 @@ public struct LogRecord: Sendable, Codable {
         message: String,
         location: LogSourceLocation,
         error: LogErrorInfo? = nil,
-        metadata: Metadata
+        metadata: Metadata,
     ) {
         self.timestamp = timestamp
         self.level = level
@@ -38,10 +38,10 @@ public struct LogRecord: Sendable, Codable {
         self.error = error
         self.metadata = metadata
     }
-    
+
     public func replacing(
         message: String? = nil,
-        metadata: Metadata? = nil
+        metadata: Metadata? = nil,
     ) -> LogRecord {
         LogRecord(
             timestamp: timestamp,
@@ -51,7 +51,7 @@ public struct LogRecord: Sendable, Codable {
             message: message ?? self.message,
             location: location,
             error: error,
-            metadata: metadata ?? self.metadata
+            metadata: metadata ?? self.metadata,
         )
     }
 }

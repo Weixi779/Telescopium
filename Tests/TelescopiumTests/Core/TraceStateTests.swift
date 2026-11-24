@@ -39,7 +39,7 @@ struct TraceStateTests {
             String(repeating: "a", count: 242) + "@x=1",
             "a@" + String(repeating: "x", count: 15) + "=1",
             "a=" + String(repeating: "x", count: 257)
-        ]
+        ],
     )
     func invalidHeader(_ header: String) throws {
         #expect(TraceState(headerValue: header) == nil)

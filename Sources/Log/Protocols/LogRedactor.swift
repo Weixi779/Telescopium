@@ -11,7 +11,7 @@ public enum RedactionPolicy: Sendable {
     case never
     case always
     case when(@Sendable () -> Bool)
-    
+
     func shouldRedact() -> Bool {
         switch self {
         case .never:

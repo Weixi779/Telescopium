@@ -41,7 +41,7 @@ struct LogLevelTests {
 
     @Test(
         "Stored levels require an exact raw value",
-        arguments: [#""verbose""#, #""WARNING""#]
+        arguments: [#""verbose""#, #""WARNING""#],
     )
     func invalidEncoding(_ json: String) {
         #expect(throws: DecodingError.self) {

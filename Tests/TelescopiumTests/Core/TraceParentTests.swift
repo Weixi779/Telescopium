@@ -31,8 +31,8 @@ struct TraceParentTests {
         arguments: [
             "00000000000000000000000000000001",
             "00000000000000010000000000000000",
-            "ffffffffffffffffffffffffffffffff"
-        ]
+            "ffffffffffffffffffffffffffffffff",
+        ],
     )
     func traceBoundaries(_ string: String) throws {
         let id = try #require(TraceId(hexString: string))
@@ -42,8 +42,8 @@ struct TraceParentTests {
     @Test(
         "Span boundaries retain leading zeros",
         arguments: [
-            "0000000000000001", "ffffffffffffffff"
-        ]
+            "0000000000000001", "ffffffffffffffff",
+        ],
     )
     func spanBoundaries(_ string: String) throws {
         let id = try #require(SpanId(hexString: string))
@@ -59,8 +59,8 @@ struct TraceParentTests {
             "4bf92f3577b34da6a3ce929d0e0e473",
             "04bf92f3577b34da6a3ce929d0e0e4736",
             "4bf92f3577b34da6a3ce929d0e0e473 ",
-            "é000000000000000000000000000000"
-        ]
+            "é000000000000000000000000000000",
+        ],
     )
     func invalidTrace(_ string: String) {
         #expect(TraceId(hexString: string) == nil)
@@ -72,7 +72,7 @@ struct TraceParentTests {
             "", "0000000000000000", "00F067AA0BA902B7", "g0f067aa0ba902b7",
             "0f067aa0ba902b7", "000f067aa0ba902b7", "00f067aa0ba902b ",
             "é00000000000000"
-        ]
+        ],
     )
     func invalidSpan(_ string: String) {
         #expect(SpanId(hexString: string) == nil)
@@ -90,7 +90,7 @@ struct TraceParentTests {
             "00-\(trace)-\(span)-1", "00-\(trace)-\(span)-001",
             "00-\(trace)-\(span)-01-extra", " \(header)", "\(header)\n",
             "00_\(trace)-\(span)-01", "00-\(trace)--01"
-        ]
+        ],
     )
     func invalidHeader(_ string: String) {
         #expect(TraceParent(headerValue: string) == nil)

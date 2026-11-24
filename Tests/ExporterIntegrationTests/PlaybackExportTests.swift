@@ -47,14 +47,14 @@ struct PlaybackExportTests {
     func exportPlaybackWarning() async throws {
         let capture = CapturingOTelExporter()
         let provider = LoggerProviderSdk(
-            logRecordProcessors: [SimpleLogRecordProcessor(logRecordExporter: capture)]
+            logRecordProcessors: [SimpleLogRecordProcessor(logRecordExporter: capture)],
         )
 
         let instance = "TelescopiumPlaybackExportTests"
         let core = Datadog.initialize(
             with: .init(clientToken: "test", env: "test", serverDateProvider: LocalClock()),
             trackingConsent: .pending,
-            instanceName: instance
+            instanceName: instance,
         )
         defer { Datadog.stopInstance(named: instance) }
         let encoded = LockedValue<Data?>(nil)
@@ -70,17 +70,17 @@ struct PlaybackExportTests {
                 received.fulfill()
                 return nil
             }),
-            in: core
+            in: core,
         )
         let ddLogger = DatadogLogs.Logger.create(with: .init(name: "Telescopium"), in: core)
         let recorder = LogRecorder(
             redactors: [EpisodeRedactor()],
-            exporters: [OTelLogExporter(provider: provider), DatadogLogExporter(logger: ddLogger)]
+            exporters: [OTelLogExporter(provider: provider), DatadogLogExporter(logger: ddLogger)],
         )
         let playback = Telescopium.Logger(
             category: "Playback",
             metadata: ["episode_id": "ep-42"],
-            recorder: recorder
+            recorder: recorder,
         )
         let route: [String: Any] = [
             "attempt": 2,
@@ -88,7 +88,7 @@ struct PlaybackExportTests {
             "latency": 1.5,
             "limit": Double.infinity,
             "fallback": NSNull(),
-            "empty": [String: Any]()
+            "empty": [String: Any](),
         ]
         let error = NSError(domain: "player", code: 17, userInfo: [NSLocalizedDescriptionKey: "Stopped"])
         playback.warning(
@@ -98,7 +98,7 @@ struct PlaybackExportTests {
             file: "Playback/Player.swift",
             function: "play()",
             line: 42,
-            column: 9
+            column: 9,
         )
 
         let records = capture.records.withLock { $0 }
@@ -123,13 +123,13 @@ struct PlaybackExportTests {
             labels: [
                 "attempt": .int(2),
                 "steps": .array(.init(values: [
-                    .bool(true), .string("null"), .set(.init(labels: ["bytes": .string("AP8=")]))
+                    .bool(true), .string("null"), .set(.init(labels: ["bytes": .string("AP8=")])),
                 ])),
                 "latency": .double(1.5),
                 "limit": .double(.infinity),
                 "fallback": .string("null"),
-                "empty": .set(.init(labels: [:]))
-            ]
+                "empty": .set(.init(labels: [:])),
+            ],
         )
         #expect(otel.attributes["route"] == .set(expected))
     }
@@ -146,7 +146,7 @@ struct PlaybackExportTests {
             "latency": 1.5,
             "limit": "Infinity",
             "fallback": NSNull(),
-            "empty": [:] as NSDictionary
+            "empty": [:] as NSDictionary,
         ]
         #expect(json["route"] as? NSDictionary == expectedRoute)
         let context = try #require(json["telescopium"] as? [String: Any])

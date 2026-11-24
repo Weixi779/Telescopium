@@ -88,8 +88,8 @@ struct BaggageTests {
             entries: [
                 "业务": entry,
                 "empty": .init(value: ""),
-                "emptyMetadata": .init(value: "x", metadata: .init(rawValue: ""))
-            ]
+                "emptyMetadata": .init(value: "x", metadata: .init(rawValue: "")),
+            ],
         )
         try roundTrip(baggage)
         try roundTrip(Baggage())
@@ -107,8 +107,8 @@ struct BaggageTests {
         arguments: [
             #"{"entries":{"key":{"value":42}}}"#,
             #"{"entries":{"key":{}}}"#,
-            #"{"entries":{"key":{"value":"x","metadata":{"rawValue":true}}}}"#
-        ]
+            #"{"entries":{"key":{"value":"x","metadata":{"rawValue":true}}}}"#,
+        ],
     )
     func invalidCoding(_ json: String) {
         #expect(throws: DecodingError.self) {

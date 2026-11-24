@@ -16,11 +16,11 @@ struct MetadataValueTests {
         let fields: Metadata = [
             "attempts": [
                 ["bytes": .bytes(Data([0xff])), "base64": "/w=="],
-                [1, 1.0, true, .null, [], [:]]
+                [1, 1.0, true, .null, [], [:]],
             ],
             "bounds": [.int(.min), .int(.max)],
             "some_key": .null,
-            "someKey": "present"
+            "someKey": "present",
         ]
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
@@ -58,8 +58,8 @@ struct MetadataValueTests {
         "Invalid metadata tags and payloads fail decoding",
         arguments: [
             #"{}"#, #"{"other":1}"#, #"{"int":1,"bool":true}"#, #"{"null":false}"#,
-            #"{"array":[{"bytes":"??"}]}"#, #"{"object":{"value":{"double":"oops"}}}"#
-        ]
+            #"{"array":[{"bytes":"??"}]}"#, #"{"object":{"value":{"double":"oops"}}}"#,
+        ],
     )
     func invalidEncoding(_ json: String) {
         #expect(throws: DecodingError.self) {

@@ -45,7 +45,7 @@ struct LogErrorInfoTests {
         let error = NSError(
             domain: NSURLErrorDomain,
             code: NSURLErrorNotConnectedToInternet,
-            userInfo: [NSLocalizedDescriptionKey: "Offline"]
+            userInfo: [NSLocalizedDescriptionKey: "Offline"],
         )
         let info = LogErrorInfo(error)
         #expect(info.message == "Offline")

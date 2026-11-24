@@ -30,7 +30,7 @@ struct SpanContextTests {
         let childID = try #require(SpanId(hexString: "0000000000000001"))
         let child = SpanContext(
             traceParent: TraceParent(traceId: parent.traceId, spanId: childID, flags: parent.flags),
-            traceState: remote.traceState
+            traceState: remote.traceState,
         )
         #expect(remote.isRemote)
         #expect(!child.isRemote)

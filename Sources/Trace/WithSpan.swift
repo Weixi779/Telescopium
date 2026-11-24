@@ -15,7 +15,7 @@ public enum TraceScope {
 public func withSpan<Result>(
     _ name: String,
     ofKind kind: SpanKind = .internal,
-    _ operation: (any Span) throws -> Result
+    _ operation: (any Span) throws -> Result,
 ) rethrows -> Result {
     let span = SpanRecord(name: name, kind: kind, parent: TraceScope.current)
     do {
@@ -35,7 +35,7 @@ public func withSpan<Result>(
     _ name: String,
     ofKind kind: SpanKind = .internal,
     isolation: isolated (any Actor)? = #isolation,
-    _ operation: (any Span) async throws -> Result
+    _ operation: (any Span) async throws -> Result,
 ) async rethrows -> Result {
     let span = SpanRecord(name: name, kind: kind, parent: TraceScope.current)
     do {

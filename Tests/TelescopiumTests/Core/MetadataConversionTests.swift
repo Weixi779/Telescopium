@@ -22,7 +22,7 @@ struct MetadataConversionTests {
     func numericTypes() {
         let values: [Any] = [
             NSNumber(value: true), NSNumber(value: 0), NSNumber(value: 1), Int8(-1),
-            UInt64(Int64.max), Float(1.25), Double(1.0), UInt64.max, Decimal(string: "1.0000000000000001")!
+            UInt64(Int64.max), Float(1.25), Double(1.0), UInt64.max, Decimal(string: "1.0000000000000001")!,
         ]
         let fields = Metadata(converting: ["values": values])
         #expect(fields["values"] == [true, 0, 1, -1, .int(.max), 1.25, 1.0])
@@ -35,11 +35,11 @@ struct MetadataConversionTests {
             "items": [bytes, Date(), NSNull()] as [Any],
             "object": ["raw": MetadataValue.string("ready"), "unsupported": URL(fileURLWithPath: "/")],
             "typed": MetadataValue.object(["flags": [true]]),
-            "emptyArray": [], "emptyObject": [:]
+            "emptyArray": [], "emptyObject": [:],
         ]
         #expect(Metadata(converting: raw) == [
             "items": [.bytes(bytes), .null], "object": ["raw": "ready"], "typed": ["flags": [true]],
-            "emptyArray": [], "emptyObject": [:]
+            "emptyArray": [], "emptyObject": [:],
         ])
     }
 
