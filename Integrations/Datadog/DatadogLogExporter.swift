@@ -24,6 +24,7 @@ private struct RecordContext: Encodable {
 }
 
 /// Forwards redacted records to a logger created by the host after enabling Datadog Logs.
+/// Set `bundleWithTraceEnabled` to `false` on that logger to use the span captured at the log call site.
 public struct DatadogLogExporter: LogExporter {
     private let logger: any LoggerProtocol
 
@@ -33,6 +34,11 @@ public struct DatadogLogExporter: LogExporter {
 
     public func export(_ record: LogRecord) {
         var attributes: [String: any Encodable] = record.metadata.mapValues(DatadogMetadataValue.init)
+        if let parent = record.traceParent {
+            // Datadog accepts these JSON correlation fields and reserves the dd.* forms for its own tracer.
+            attributes["trace_id"] = parent.traceId.hexString
+            attributes["span_id"] = parent.spanId.hexString
+        }
         attributes["telescopium"] = RecordContext(
             category: record.category,
             subsystem: record.subsystem,

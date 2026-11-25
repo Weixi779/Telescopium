@@ -33,12 +33,20 @@ public struct OTelLogExporter: LogExporter {
         }
 
         let logger = provider.get(instrumentationScopeName: record.category)
-        logger.logRecordBuilder()
+        var builder = logger.logRecordBuilder()
             .setTimestamp(record.timestamp)
             .setSeverity(record.level.otelSeverity)
             .setBody(.string(record.message))
             .setAttributes(attributes)
-            .emit()
+        if let parent = record.traceParent {
+            builder = builder.setSpanContext(.create(
+                traceId: .init(fromHexString: parent.traceId.hexString),
+                spanId: .init(fromHexString: parent.spanId.hexString),
+                traceFlags: .init(fromByte: parent.flags),
+                traceState: .init(),
+            ))
+        }
+        builder.emit()
     }
 }
 

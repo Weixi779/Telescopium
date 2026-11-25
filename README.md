@@ -188,7 +188,10 @@ import DatadogLogs
 // The App supplies its configured OTel LoggerProvider, Datadog configuration and consent.
 let core = Datadog.initialize(with: datadogConfiguration, trackingConsent: consent)
 Logs.enable(in: core)
-let ddLogger = DatadogLogs.Logger.create(with: .init(name: "Telescopium"), in: core)
+let ddLogger = DatadogLogs.Logger.create(
+    with: .init(name: "Telescopium", bundleWithTraceEnabled: false),
+    in: core
+)
 
 Log.register(
     recorder: LogRecorder(
@@ -198,13 +201,16 @@ Log.register(
             OTelLogExporter(provider: provider),
             DatadogLogExporter(logger: ddLogger)
         ]
-    )
+    ),
+    enrichers: [TraceCorrelationEnricher()]
 )
 
 Telescopium.Logger(category: "Playback").warning("Retry playback", metadata: ["attempt": 2])
 ```
 
 The OTel exporter uses the category as the instrumentation scope and preserves the record timestamp. Datadog uses the host logger's name and its SDK clock. The adapter also sends the category, subsystem, original epoch milliseconds, location and error snapshot in the `telescopium` attribute. The App owns SDK configuration, batching and upload.
+
+When a record has a trace parent, the OTel exporter sets its native span context with the captured trace ID, span ID and flags. With no captured parent, the OTel SDK can use its active span at export time. Datadog receives the captured IDs as full lowercase hexadecimal strings in the top-level `trace_id` and `span_id` fields. The dedicated Datadog logger above disables automatic trace bundling so delayed logs keep their original association. [Datadog JSON correlation fields](https://docs.datadoghq.com/logs/log_configuration/pipelines/#trace-id-attribute)
 
 Both exporters recursively map metadata after redaction. The table shows how to query the resulting fields.
 
