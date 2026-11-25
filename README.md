@@ -463,7 +463,7 @@ swiftlint lint --strict # Check for lint violations
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full terms and [NOTICE](NOTICE) for attribution.
 
 ## Acknowledgments
 

@@ -1,0 +1,6 @@
+Telescopium
+Copyright (c) 2025 shiwei.sun
+
+The SplitMix64 generator in Sources/Core/TraceParent/SeededRandomNumberGenerator.swift
+is based on the public-domain reference implementation written by Sebastiano Vigna in 2015.
+https://prng.di.unimi.it/splitmix.c
