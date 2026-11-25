@@ -24,11 +24,12 @@ public enum RedactionPolicy: Sendable {
     }
 }
 
-/// Scrubs sensitive data from log records.
-public protocol LogRedactor: Sendable {
+/// Scrubs sensitive data before export.
+///
+/// For each record, `LogRecorder` runs each enabled redactor once in configuration
+/// order, passing its result to the next redactor. All exporters receive the final result.
+public protocol LogRedactor: LogRecordProcessor {
     var policy: RedactionPolicy { get }
-    /// May be called concurrently. Returns the record passed to subsequent redactors and sinks.
-    func redact(_ record: LogRecord) -> LogRecord
 }
 
 public extension LogRedactor {

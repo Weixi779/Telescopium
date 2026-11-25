@@ -128,9 +128,10 @@ final class TokenRedactor: LogRedactor {
         ProcessInfo.processInfo.environment["ENV"] == "prod"
     }
     
-    func redact(_ record: LogRecord) -> LogRecord {
-        // Replace sensitive values in record.message/record.metadata.
-        return record
+    func process(_ record: LogRecord) -> LogRecord {
+        var result = record
+        result.metadata.removeValue(forKey: "token")
+        return result
     }
 }
 
@@ -139,7 +140,8 @@ Log.register(
     recorder: LogRecorder(
         redactors: [TokenRedactor()],
         exporters: [OSLogExporter(), RemoteExporter()]
-    )
+    ),
+    enrichers: [TraceCorrelationEnricher()]
 )
 
 // Playback
@@ -147,7 +149,9 @@ let logger = Logger(category: "Playback")
 logger.info("Play tapped")
 ```
 
-Each log call reads the current application recorder. Registering a replacement also affects loggers created before registration. A record already handed to the previous recorder finishes there. A logger created with `Logger(category: "Playback", recorder: recorder)` uses that recorder for its lifetime.
+Each log call takes one snapshot of the application configuration. After merging metadata, the logger runs the registered enrichers synchronously in order. In this example, `TraceCorrelationEnricher` captures the current span in `record.traceParent`, so a recorder can queue the record and export it after the span ends. A logger created with `Logger(category: "Playback", recorder: recorder)` runs the same enrichers and sends the result to its own recorder. Other loggers use the recorder from the snapshot.
+
+`LogRecorder` applies each enabled redactor once, in order, then sends the final record to every exporter. Both `LogEnricher` and `LogRedactor` inherit `LogRecordProcessor`. A host can also use `[any LogRecordProcessor]` directly and pass each returned record to the next processor.
 
 With no registration, the application uses `LogRecorder()`, which exports to `OSLogExporter`. Register `LogRecorder(exporters: [])` to silence application logging, or register `LogRecorder()` to restore the default output.
 
@@ -222,9 +226,10 @@ import Telescopium
 struct MaskingRedactor: LogRedactor {
     let policy: RedactionPolicy = .always
     
-    func redact(_ record: LogRecord) -> LogRecord {
-        let masked: Metadata = record.metadata.mapValues { _ in "***" }
-        return record.replacing(metadata: masked)
+    func process(_ record: LogRecord) -> LogRecord {
+        var result = record
+        result.metadata = record.metadata.mapValues { _ in "***" }
+        return result
     }
 }
 

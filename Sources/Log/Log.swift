@@ -6,17 +6,27 @@
 //  Copyright © 2026 Telescopium.
 //
 
-/// Configures the recorder used by the application's loggers.
+/// Configures enrichment and recording for the application's loggers.
 public enum Log {
-    private static let fallback = LogRecorder()
-
-    /// Replaces the application recorder. Each log call uses the recorder it acquired.
-    /// Loggers initialized with an explicit recorder keep using it.
-    public static func register(recorder: any LogRecording) {
-        ServiceRegistry.application.register((any LogRecording).self, instance: recorder)
+    struct Configuration: Sendable {
+        let recorder: any LogRecording
+        let enrichers: [any LogEnricher]
     }
 
-    static var currentRecorder: any LogRecording {
-        ServiceRegistry.application.resolve((any LogRecording).self) ?? fallback
+    private static let fallback = Configuration(recorder: LogRecorder(), enrichers: [])
+
+    /// Replaces the application recorder and ordered enrichers together.
+    /// Each log call uses one configuration. Explicitly bound loggers use its enrichers
+    /// and continue sending the result to their own recorder.
+    public static func register(
+        recorder: any LogRecording,
+        enrichers: [any LogEnricher] = [],
+    ) {
+        let configuration = Configuration(recorder: recorder, enrichers: enrichers)
+        ServiceRegistry.application.register(Configuration.self, instance: configuration)
+    }
+
+    static var currentConfiguration: Configuration {
+        ServiceRegistry.application.resolve(Configuration.self) ?? fallback
     }
 }

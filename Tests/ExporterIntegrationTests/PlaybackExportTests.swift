@@ -35,10 +35,10 @@ private struct LocalClock: ServerDateProvider {
 }
 
 private struct EpisodeRedactor: LogRedactor {
-    func redact(_ record: LogRecord) -> LogRecord {
-        var metadata = record.metadata
-        metadata["episode_id"] = "***"
-        return record.replacing(metadata: metadata)
+    func process(_ record: LogRecord) -> LogRecord {
+        var result = record
+        result.metadata["episode_id"] = "***"
+        return result
     }
 }
 

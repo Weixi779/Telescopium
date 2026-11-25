@@ -6,7 +6,7 @@
 //  Copyright © 2026 Telescopium.
 //
 
-/// Receives a logger's complete record before redaction or export.
+/// Receives a logger's enriched record before redaction or export.
 public protocol LogRecording: Sendable {
     /// Called synchronously on the logging caller's thread. Calls can overlap.
     func record(_ record: LogRecord)

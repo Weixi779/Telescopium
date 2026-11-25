@@ -33,14 +33,28 @@ private final class CaptureExporter: LogExporter {
 private struct TestRedactor: LogRedactor {
     let suffix: String
     let policy: RedactionPolicy
+    let calls = LockedValue(0)
 
     init(suffix: String, policy: RedactionPolicy = .always) {
         self.suffix = suffix
         self.policy = policy
     }
 
-    func redact(_ record: LogRecord) -> LogRecord {
-        record.replacing(message: record.message + suffix)
+    func process(_ record: LogRecord) -> LogRecord {
+        calls.withLock { $0 += 1 }
+        var result = record
+        result.message += suffix
+        return result
+    }
+}
+
+private struct SpanIDEnricher: LogEnricher {
+    func process(_ record: LogRecord) -> LogRecord {
+        var result = record
+        if let parent = record.traceParent {
+            result.metadata["span_id"] = .string(parent.spanId.hexString)
+        }
+        return result
     }
 }
 
@@ -184,13 +198,12 @@ struct LoggerTests {
         #expect(records[2].metadata.isEmpty)
         let data = try JSONEncoder().encode(retry)
         #expect(try JSONDecoder().decode(LogRecord.self, from: data).metadata == expected)
-        #expect(retry.replacing(metadata: ["masked": true]).metadata == ["masked": true])
     }
 
     @Test("An existing logger follows registration and an explicitly bound logger keeps its recorder")
     func testRecorderBinding() {
-        let previous = Log.currentRecorder
-        defer { Log.register(recorder: previous) }
+        let previous = Log.currentConfiguration
+        defer { Log.register(recorder: previous.recorder, enrichers: previous.enrichers) }
 
         let playback = Logger(category: "Playback")
         let first = CaptureExporter()
@@ -213,8 +226,8 @@ struct LoggerTests {
 
     @Test("A replacement can record while a call to the previous recorder is still in progress")
     func testReplaceWhileRecording() throws {
-        let previous = Log.currentRecorder
-        defer { Log.register(recorder: previous) }
+        let previous = Log.currentConfiguration
+        defer { Log.register(recorder: previous.recorder, enrichers: previous.enrichers) }
 
         let first = CaptureExporter()
         let second = CaptureExporter()
@@ -250,17 +263,62 @@ struct LoggerTests {
         #expect(first.records.map(\.message) == ["In flight"])
     }
 
-    @Test("Redactors run in order before every exporter and evaluate their policies for each record")
+    @Test("Both recorder bindings receive ordered enrichment from the logging scope before deferred export")
+    func enrichmentAtLogCall() throws {
+        let previous = Log.currentConfiguration
+        defer { Log.register(recorder: previous.recorder, enrichers: previous.enrichers) }
+
+        let appRecords = CaptureExporter()
+        let pending = LockedValue<[LogRecord]>([])
+        let appLogger = Logger(category: "Playback")
+        let fixedLogger = Logger(
+            category: "Playback",
+            recorder: CallbackRecorder { record in pending.withLock { $0.append(record) } },
+        )
+        let recorder = LogRecorder(exporters: [appRecords])
+        Log.register(recorder: recorder, enrichers: [TraceCorrelationEnricher(), SpanIDEnricher()])
+
+        let parent = TraceParent.random()
+        let child = TraceParent(traceId: parent.traceId, spanId: .random(), flags: parent.flags)
+        TraceScope.$current.withValue(SpanContext(traceParent: parent)) {
+            TraceScope.$current.withValue(SpanContext(traceParent: child)) {
+                fixedLogger.info("Child")
+            }
+            appLogger.info("Parent")
+        }
+        fixedLogger.info("Outside")
+        Log.register(recorder: recorder)
+        TraceScope.$current.withValue(SpanContext(traceParent: parent)) {
+            fixedLogger.info("After unregistering enrichers")
+        }
+
+        let records = pending.withLock { $0 }
+        #expect(records.map(\.traceParent) == [child, nil, nil])
+        #expect(appRecords.records.map(\.traceParent) == [parent])
+        #expect(appRecords.records.first?.metadata["span_id"] == .string(parent.spanId.hexString))
+        let queued = try #require(records.first)
+        #expect(queued.metadata["span_id"] == .string(child.spanId.hexString))
+        TraceScope.$current.withValue(SpanContext(traceParent: parent)) {
+            #expect(TraceCorrelationEnricher().process(queued).traceParent == child)
+        }
+        let data = try JSONEncoder().encode(queued)
+        let decoded = try JSONDecoder().decode(LogRecord.self, from: data)
+        let output = CaptureExporter()
+        LogRecorder(redactors: [TestRedactor(suffix: "_masked")], exporters: [output]).record(decoded)
+        #expect(output.records.first?.traceParent == child)
+        #expect(output.records.first?.message == "Child_masked")
+    }
+
+    @Test("Enabled redactors run once per record in order, and exporters share the result")
     func testRedactionAndExport() throws {
         let enabled = LockedValue(false)
+        let skipped = TestRedactor(suffix: "_skipped", policy: .never)
+        let always = TestRedactor(suffix: "_one")
+        let conditional = TestRedactor(suffix: "_two", policy: .when { enabled.withLock { $0 } })
         let first = CaptureExporter()
         let second = CaptureExporter()
         let recorder = LogRecorder(
-            redactors: [
-                TestRedactor(suffix: "_skipped", policy: .never),
-                TestRedactor(suffix: "_one"),
-                TestRedactor(suffix: "_two", policy: .when { enabled.withLock { $0 } }),
-            ],
+            redactors: [skipped, always, conditional],
             exporters: [first, second],
         )
         let logger = Logger(category: "   ", recorder: recorder)
@@ -279,6 +337,9 @@ struct LoggerTests {
         let messages = ["First_one", "Second_one_two"]
         #expect(records.map(\.message) == messages)
         #expect(second.records.map(\.message) == messages)
+        #expect(skipped.calls.withLock { $0 } == 0)
+        #expect(always.calls.withLock { $0 } == 2)
+        #expect(conditional.calls.withLock { $0 } == 1)
         let fault = try #require(records.last)
         #expect(fault.category == Logger.defaultCategory)
         #expect(fault.level == .fault)

@@ -22,7 +22,7 @@ public struct LogRecorder: LogRecording {
     public func record(_ record: LogRecord) {
         var output = record
         for redactor in redactors where redactor.policy.shouldRedact() {
-            output = redactor.redact(output)
+            output = redactor.process(output)
         }
 
         for exporter in exporters {

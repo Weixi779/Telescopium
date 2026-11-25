@@ -14,10 +14,12 @@ public struct LogRecord: Sendable, Codable {
     public let level: LogLevel
     public let category: String
     public let subsystem: String
-    public let message: String
+    public var message: String
     public let location: LogSourceLocation
     public let error: LogErrorInfo?
-    public let metadata: Metadata
+    public var metadata: Metadata
+    /// Identifies the span associated with this record at the logging call site.
+    public var traceParent: TraceParent?
 
     public init(
         timestamp: Date,
@@ -28,6 +30,7 @@ public struct LogRecord: Sendable, Codable {
         location: LogSourceLocation,
         error: LogErrorInfo? = nil,
         metadata: Metadata,
+        traceParent: TraceParent? = nil,
     ) {
         self.timestamp = timestamp
         self.level = level
@@ -37,21 +40,6 @@ public struct LogRecord: Sendable, Codable {
         self.location = location
         self.error = error
         self.metadata = metadata
-    }
-
-    public func replacing(
-        message: String? = nil,
-        metadata: Metadata? = nil,
-    ) -> LogRecord {
-        LogRecord(
-            timestamp: timestamp,
-            level: level,
-            category: category,
-            subsystem: subsystem,
-            message: message ?? self.message,
-            location: location,
-            error: error,
-            metadata: metadata ?? self.metadata,
-        )
+        self.traceParent = traceParent
     }
 }

@@ -51,7 +51,7 @@ public struct Logger: @unchecked Sendable {
         line: Int,
         column: Int,
     ) {
-        let record = LogRecord(
+        var record = LogRecord(
             timestamp: Date(),
             level: level,
             category: category,
@@ -66,7 +66,11 @@ public struct Logger: @unchecked Sendable {
             error: error.map(LogErrorInfo.init),
             metadata: defaultMetadata.merging(overrides: Metadata(converting: metadata)),
         )
-        let recorder = explicitRecorder ?? Log.currentRecorder
+        let configuration = Log.currentConfiguration
+        for enricher in configuration.enrichers {
+            record = enricher.process(record)
+        }
+        let recorder = explicitRecorder ?? configuration.recorder
         recorder.record(record)
     }
 
