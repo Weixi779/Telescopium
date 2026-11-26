@@ -48,6 +48,22 @@ struct TelescopiumTracerTests {
         #expect(record.error == nil)
     }
 
+    @Test("Concurrent ends without a callback close the span without describing its error")
+    func concurrentEndWithoutCallback() {
+        let tracer = TelescopiumTracer()
+        let span = tracer.startSpan("Request", ofKind: .client, parent: nil)
+        let error = DescribedError {
+            Issue.record("A tracer without a finish callback evaluated errorDescription")
+            return "Offline"
+        }
+
+        DispatchQueue.concurrentPerform(iterations: 64) { _ in
+            tracer.endSpan(span, throwing: error)
+        }
+
+        #expect(span.finish(throwing: nil) == nil)
+    }
+
     @Test("Wall-clock adjustments in either direction leave the elapsed duration intact", arguments: [Date.distantFuture, .distantPast])
     func elapsedDuration(startTime: Date) throws {
         let now = ContinuousClock.now

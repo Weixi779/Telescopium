@@ -46,6 +46,10 @@ public final class TelescopiumSpan: Span {
         recording.withLock { $0?.events.append(event) }
     }
 
+    func finishWithoutRecord() {
+        _ = recording.withLock { $0.take() }
+    }
+
     func finish(throwing error: (any Error)?) -> SpanRecord? {
         guard let (contents, endTime, duration) = finishRecording() else { return nil }
         return SpanRecord(
@@ -64,8 +68,7 @@ public final class TelescopiumSpan: Span {
 
     private func finishRecording() -> (Recording, Date, Duration)? {
         recording.withLock { recording in
-            guard let contents = recording else { return nil }
-            recording = nil
+            guard let contents = recording.take() else { return nil }
             return (contents, .now, startInstant.duration(to: .now))
         }
     }

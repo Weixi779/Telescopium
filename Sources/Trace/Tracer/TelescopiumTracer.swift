@@ -8,11 +8,11 @@
 
 /// Creates spans and delivers their completed records.
 public struct TelescopiumTracer: Tracer {
-    private let onFinish: @Sendable (SpanRecord) -> Void
+    private let onFinish: (@Sendable (SpanRecord) -> Void)?
 
     /// The first end of each span calls `onFinish` synchronously, after releasing the span's lock.
-    /// Callbacks for different spans can overlap. The default callback discards the record.
-    public init(onFinish: @escaping @Sendable (SpanRecord) -> Void = { _ in }) {
+    /// Callbacks for different spans can overlap. With no callback, ending a span only closes its recording.
+    public init(onFinish: (@Sendable (SpanRecord) -> Void)? = nil) {
         self.onFinish = onFinish
     }
 
@@ -21,6 +21,10 @@ public struct TelescopiumTracer: Tracer {
     }
 
     public func endSpan(_ span: TelescopiumSpan, throwing error: (any Error)?) {
+        guard let onFinish else {
+            span.finishWithoutRecord()
+            return
+        }
         guard let record = span.finish(throwing: error) else { return }
         onFinish(record)
     }

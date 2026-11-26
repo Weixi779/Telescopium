@@ -79,7 +79,7 @@ let order = try await withSpan("Submit order") { span in
 }
 ```
 
-The built-in `TelescopiumTracer` creates a `TelescopiumSpan` for each operation. Its optional `onFinish` callback receives one `SpanRecord` on the caller's thread when the span first ends. The default tracer discards finished records.
+The built-in `TelescopiumTracer` creates a `TelescopiumSpan` for each operation. By default, ending the span only closes its recording. When you supply `onFinish`, the first end creates one `SpanRecord` and delivers it synchronously on the caller's thread.
 
 ```swift
 Trace.register(tracer: TelescopiumTracer { record in
