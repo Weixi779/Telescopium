@@ -94,21 +94,31 @@ Trace.register(tracer: TelescopiumTracer(exporter: exporter))
 
 Calls to the exporter for different spans can overlap. The global `withSpan` looks up the app's registered tracer when each span starts. Call `tracer.withSpan` to use an injected tracer directly. Both forms finish the span with the tracer that created it.
 
-When a screen spans several callbacks, keep its tracer and span on the screen owner. Use `withCurrent` inside each callback that belongs to the screen. A nested `withSpan` then uses the screen as its parent. Returning or throwing from the callback restores its previous context.
+When a screen spans several callbacks, the screen owner can store the span and its matching end operation. An initializer taking `some Tracer` keeps the tracer's associated span type available when it builds that operation. This also works when the app passes an `any Tracer` or a tracer decorated with `signposted(by:)`.
 
 ```swift
-// When the screen opens, use the tracer injected by the app.
-let page = tracer.startSpan("Order details", ofKind: .internal, parent: TraceScope.current)
+final class OrderDetailsModel {
+    let page: any Span
+    let close: () -> Void
+
+    init(tracer: some Tracer) {
+        let page = tracer.startSpan("Order details", ofKind: .internal, parent: TraceScope.current)
+        self.page = page
+        close = { tracer.endSpan(page, throwing: nil) }
+    }
+}
+
+let model = OrderDetailsModel(tracer: tracer)
 
 // Later, in the refresh action.
-let order = try await page.withCurrent {
+let order = try await model.page.withCurrent {
     try await withSpan("GET /orders/{id}", ofKind: .client) { _ in
         try await orders.fetch(id)
     }
 }
 
 // When the screen closes.
-tracer.endSpan(page, throwing: nil)
+model.close()
 ```
 
 ### Basic Logging
