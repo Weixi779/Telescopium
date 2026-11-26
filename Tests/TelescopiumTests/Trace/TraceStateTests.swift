@@ -11,6 +11,44 @@ import Testing
 import Telescopium
 
 struct TraceStateTests {
+    @Test("Setting a vendor entry puts it first and preserves the order of the others")
+    func settingValue() throws {
+        let state = try #require(TraceState(headerValue: "rojo=42,acme=old,congo=7"))
+        let updated = try #require(state.settingValue("new", forKey: "acme"))
+        #expect(updated.headerValue == "acme=new,rojo=42,congo=7")
+        let added = try #require(updated.settingValue("first", forKey: "another"))
+        #expect(added.headerValue == "another=first,acme=new,rojo=42,congo=7")
+        #expect(state.headerValue == "rojo=42,acme=old,congo=7")
+    }
+
+    @Test("Invalid keys and values fail even when replacing an existing entry")
+    func invalidUpdate() throws {
+        let state = try #require(TraceState(headerValue: "acme=old"))
+        #expect(state.settingValue("new", forKey: "ACME") == nil)
+        #expect(state.settingValue("a,b", forKey: "acme") == nil)
+        #expect(state["acme"] == "old")
+    }
+
+    @Test("Only insertion evicts the rightmost entry from a full state")
+    func updateAtCapacity() throws {
+        let members = (1...32).map { "v\($0)=x" }
+        let state = try #require(TraceState(headerValue: members.joined(separator: ",")))
+
+        let added = try #require(state.settingValue("y", forKey: "extra"))
+        #expect(added.headerValue == (["extra=y"] + members.dropLast()).joined(separator: ","))
+
+        let replaced = try #require(state.settingValue("y", forKey: "v2"))
+        #expect(replaced.headerValue == (["v2=y", "v1=x"] + members.dropFirst(2)).joined(separator: ","))
+    }
+
+    @Test("Removing a vendor entry preserves its neighbors and ignores an absent key")
+    func removingValue() throws {
+        let state = try #require(TraceState(headerValue: "rojo=42,acme=old,congo=7"))
+        #expect(state.removingValue(forKey: "acme").headerValue == "rojo=42,congo=7")
+        #expect(state.removingValue(forKey: "absent") == state)
+        #expect(state["acme"] == "old")
+    }
+
     @Test("A header retains vendor order and opaque values through Codable")
     func orderedRoundTrip() throws {
         let state = try #require(TraceState(headerValue: " \t9@rojo= leading space , , congo=x:y/z\t"))

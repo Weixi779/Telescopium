@@ -23,4 +23,14 @@ public struct SpanContext: Sendable, Hashable, Codable {
         self.traceState = traceState
         self.isRemote = isRemote
     }
+
+    /// Creates a local root context with fresh identifiers, zero flags, and empty vendor state.
+    public static func root() -> SpanContext {
+        SpanContext(traceParent: .random())
+    }
+
+    /// Derives a local context with a fresh span ID, inheriting the trace ID, flags, and vendor state.
+    public func child() -> SpanContext {
+        SpanContext(traceParent: traceParent.child(), traceState: traceState)
+    }
 }

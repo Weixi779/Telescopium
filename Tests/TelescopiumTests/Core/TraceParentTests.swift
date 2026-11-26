@@ -26,6 +26,21 @@ struct TraceParentTests {
         #expect(Set([parent, parent]).count == 1)
     }
 
+    @Test("Children inherit the trace ID and every flag bit with a generated or supplied span ID")
+    func childPropagation() throws {
+        let header = "00-\(Self.trace)-\(Self.span)-a3"
+        let original = try #require(TraceParent(headerValue: header))
+        let span = try #require(SpanId(hexString: "0000000000000001"))
+
+        let child = original.child()
+        #expect(child.traceId == original.traceId)
+        #expect(child.flags == original.flags)
+        #expect(child.spanId != original.spanId)
+        #expect(child.spanId != original.child().spanId)
+        #expect(original.child(spanId: span).headerValue == "00-\(Self.trace)-0000000000000001-a3")
+        #expect(original.headerValue == header)
+    }
+
     @Test(
         "Identifier boundaries retain leading zeros",
         arguments: [
@@ -96,12 +111,13 @@ struct TraceParentTests {
         #expect(TraceParent(headerValue: string) == nil)
     }
 
-    @Test("All flag bytes are preserved")
+    @Test("All flag bytes are preserved and only the low bit indicates sampling")
     func flagsRoundTrip() throws {
         let trace = try #require(TraceId(hexString: Self.trace))
         let span = try #require(SpanId(hexString: Self.span))
         for flags in UInt8.min...UInt8.max {
             let parent = TraceParent(traceId: trace, spanId: span, flags: flags)
+            #expect(parent.isSampled == !flags.isMultiple(of: 2))
             #expect(parent.headerValue.utf8.count == 55)
             #expect(TraceParent(headerValue: parent.headerValue) == parent)
         }
