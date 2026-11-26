@@ -11,53 +11,63 @@ import Foundation
 /// An operation recorded by `TelescopiumTracer`. All holders update the same span.
 public final class TelescopiumSpan: Span {
     private struct Recording: Sendable {
+        let name: String
+        let kind: SpanKind
+        let parentSpanId: SpanId?
+        let startTime: Date
+        let startInstant: ContinuousClock.Instant
         var metadata: Metadata = [:]
         var events: [SpanEvent] = []
     }
 
     public let context: SpanContext
-    private let name: String
-    private let kind: SpanKind
-    private let parentSpanId: SpanId?
-    private let startTime: Date
-    private let startInstant: ContinuousClock.Instant
-    private let recording = LockedValue<Recording?>(Recording())
+    /// Allocated only for recorded spans. The value inside is consumed by the first end.
+    private let recording: LockedValue<Recording?>?
+
+    init(context: SpanContext) {
+        self.context = context
+        recording = nil
+    }
 
     init(
         name: String,
         kind: SpanKind,
-        parent: SpanContext?,
+        context: SpanContext,
+        parentSpanId: SpanId?,
         startTime: Date = .now,
         startInstant: ContinuousClock.Instant = .now,
     ) {
-        self.name = name
-        self.kind = kind
-        self.startTime = startTime
-        self.startInstant = startInstant
-        parentSpanId = parent?.traceParent.spanId
-        context = parent?.child() ?? .root()
+        self.context = context
+        let contents = Recording(
+            name: name,
+            kind: kind,
+            parentSpanId: parentSpanId,
+            startTime: startTime,
+            startInstant: startInstant,
+        )
+        recording = LockedValue(contents)
     }
 
     public func setMetadata(_ value: MetadataValue, forKey key: String) {
-        recording.withLock { $0?.metadata[key] = value }
+        recording?.withLock { $0?.metadata[key] = value }
     }
 
     public func addEvent(_ event: SpanEvent) {
-        recording.withLock { $0?.events.append(event) }
+        recording?.withLock { $0?.events.append(event) }
     }
 
     func finishWithoutRecord() {
-        _ = recording.withLock { $0.take() }
+        _ = recording?.withLock { $0.take() }
     }
 
     func finish(throwing error: (any Error)?) -> SpanRecord? {
         guard let (contents, endTime, duration) = finishRecording() else { return nil }
         return SpanRecord(
-            name: name,
-            kind: kind,
+            name: contents.name,
+            kind: contents.kind,
             context: context,
-            parentSpanId: parentSpanId,
-            startTime: startTime,
+            parentSpanId: contents.parentSpanId,
+            startTime: contents.startTime,
             endTime: endTime,
             duration: duration,
             metadata: contents.metadata,
@@ -67,9 +77,9 @@ public final class TelescopiumSpan: Span {
     }
 
     private func finishRecording() -> (Recording, Date, Duration)? {
-        recording.withLock { recording in
+        recording?.withLock { recording in
             guard let contents = recording.take() else { return nil }
-            return (contents, .now, startInstant.duration(to: .now))
+            return (contents, .now, contents.startInstant.duration(to: .now))
         }
     }
 }

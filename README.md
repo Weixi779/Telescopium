@@ -62,6 +62,8 @@ They encode as single strings and reject invalid strings during decoding.
 Identifiers preserve leading zeros and reject all-zero values. Header parsing rejects unsupported versions,
 uppercase hexadecimal, extra fields, and surrounding whitespace. Raw flag bytes are preserved.
 
+The built-in tracer starts a root with the sampled flag clear and propagates a parent's flags to its children. Its own recording is controlled by the configured span exporter.
+
 The seeded generator uses SplitMix64 and is not cryptographically secure. Use the default system random
 source for production identifiers; restarting a fixed seed repeats identifiers. A trace identifier consumes
 two random words (high, then low), followed by one word for the span identifier; all-zero identifiers are retried.
@@ -79,7 +81,7 @@ let order = try await withSpan("Submit order") { span in
 }
 ```
 
-The built-in `TelescopiumTracer` creates a `TelescopiumSpan` for each operation. By default, ending the span only closes its recording. When you supply a `SpanExporter`, the first end creates one `SpanRecord` and delivers it synchronously to the exporter on the caller's thread.
+The built-in `TelescopiumTracer` creates a `TelescopiumSpan` for each operation. By default, the span carries only its context for propagation. When you supply a `SpanExporter`, the tracer also records timing, metadata, and events. The first end creates one `SpanRecord` and delivers it synchronously to the exporter on the caller's thread.
 
 ```swift
 struct ConsoleSpanExporter: SpanExporter {

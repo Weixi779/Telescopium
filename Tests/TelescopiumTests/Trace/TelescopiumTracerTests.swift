@@ -56,7 +56,7 @@ struct TelescopiumTracerTests {
         #expect(record.error == nil)
     }
 
-    @Test("Concurrent ends without an exporter close the span without describing its error")
+    @Test("Concurrent ends on a context-only span never describe its error")
     func concurrentEndWithoutExporter() {
         let tracer = TelescopiumTracer()
         let span = tracer.startSpan("Request", ofKind: .client, parent: nil)
@@ -72,6 +72,37 @@ struct TelescopiumTracerTests {
         #expect(span.finish(throwing: nil) == nil)
     }
 
+    @Test("A context-only span can parent an exported request across suspension")
+    func contextOnlyParent() async throws {
+        let tracer = TelescopiumTracer()
+        let outer = SpanContext.root()
+        let page = tracer.startSpan("Page", ofKind: .internal, parent: outer)
+        defer { tracer.endSpan(page, throwing: nil) }
+        page.setMetadata(1, forKey: "page")
+        page.addEvent(SpanEvent("Opened"))
+
+        let exporter = CapturingSpanExporter()
+        let requestTracer = TelescopiumTracer(exporter: exporter)
+        await TraceScope.$current.withValue(outer) {
+            await page.withCurrent {
+                await Task.yield()
+                #expect(TraceScope.current == page.context)
+                requestTracer.withSpan("Refresh", ofKind: .client) { request in
+                    #expect(TraceScope.current == request.context)
+                }
+                #expect(TraceScope.current == page.context)
+            }
+            #expect(TraceScope.current == outer)
+        }
+
+        let records = exporter.records
+        try #require(records.count == 1)
+        #expect(records[0].parentSpanId == page.context.traceParent.spanId)
+        #expect(records[0].context.traceParent.traceId == outer.traceParent.traceId)
+        #expect(page.context.traceParent.spanId != outer.traceParent.spanId)
+        #expect(page.finish(throwing: nil) == nil)
+    }
+
     @Test("Wall-clock adjustments in either direction leave the elapsed duration intact", arguments: [Date.distantFuture, .distantPast])
     func elapsedDuration(startTime: Date) throws {
         let now = ContinuousClock.now
@@ -79,7 +110,8 @@ struct TelescopiumTracerTests {
         let span = TelescopiumSpan(
             name: "Request",
             kind: .client,
-            parent: nil,
+            context: .root(),
+            parentSpanId: nil,
             startTime: startTime,
             startInstant: startInstant,
         )
