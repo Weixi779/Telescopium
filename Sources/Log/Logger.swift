@@ -9,6 +9,8 @@
 import Foundation
 
 /// Creates structured log records with source context and sends them to the selected recorder.
+/// Message and per-call metadata expressions are evaluated once, on the caller, for accepted levels only.
+/// All five levels capture the caller's file, function, line, and column and accept an optional error.
 public struct Logger: Sendable {
     private static let subsystem = Bundle.main.bundleIdentifier ?? "app"
     public static let defaultCategory = "Default"
@@ -37,20 +39,24 @@ public struct Logger: Sendable {
 
     private func emitRecord(
         level: LogLevel,
-        msg: String,
+        msg: () -> String,
         error: (any Error)?,
-        metadata: [String: Any],
+        metadata: () -> [String: Any],
         file: StaticString,
         function: StaticString,
         line: Int,
         column: Int,
     ) {
+        let configuration = Log.currentConfiguration
+        let recorder = explicitRecorder ?? configuration.recorder
+        guard recorder.isEnabled(for: level) else { return }
+
         var record = LogRecord(
             timestamp: Date(),
             level: level,
             category: category,
             subsystem: Self.subsystem,
-            message: msg,
+            message: msg(),
             location: LogSourceLocation(
                 fileID: String(describing: file),
                 function: String(describing: function),
@@ -58,29 +64,19 @@ public struct Logger: Sendable {
                 column: column,
             ),
             error: error.map(ErrorInfo.init),
-            metadata: defaultMetadata.merging(overrides: Metadata(converting: metadata)),
+            metadata: defaultMetadata.merging(overrides: Metadata(converting: metadata())),
         )
-        let configuration = Log.currentConfiguration
         for enricher in configuration.enrichers {
             record = enricher.process(record)
         }
-        let recorder = explicitRecorder ?? configuration.recorder
         recorder.record(record)
     }
 
     /// Logs an informational message.
-    /// - Parameters:
-    ///   - msg: The message to log
-    ///   - error: An optional error to capture with this record
-    ///   - metadata: Optional key-value pairs attached to the log record
-    ///   - file: The file where the log is called (automatically captured)
-    ///   - function: The function where the log is called (automatically captured)
-    ///   - line: The line number where the log is called (automatically captured)
-    ///   - column: The column where the log is called (automatically captured)
     public func info(
-        _ msg: String,
+        _ msg: @autoclosure () -> String,
         error: (any Error)? = nil,
-        metadata: [String: Any] = [:],
+        metadata: @autoclosure () -> [String: Any] = [:],
         file: StaticString = #fileID,
         function: StaticString = #function,
         line: Int = #line,
@@ -99,18 +95,10 @@ public struct Logger: Sendable {
     }
 
     /// Sends a debug record to the selected recorder.
-    /// - Parameters:
-    ///   - msg: The message to log
-    ///   - error: An optional error to capture with this record
-    ///   - metadata: Optional key-value pairs attached to the log record
-    ///   - file: The file where the log is called (automatically captured)
-    ///   - function: The function where the log is called (automatically captured)
-    ///   - line: The line number where the log is called (automatically captured)
-    ///   - column: The column where the log is called (automatically captured)
     public func debug(
-        _ msg: String,
+        _ msg: @autoclosure () -> String,
         error: (any Error)? = nil,
-        metadata: [String: Any] = [:],
+        metadata: @autoclosure () -> [String: Any] = [:],
         file: StaticString = #fileID,
         function: StaticString = #function,
         line: Int = #line,
@@ -130,9 +118,9 @@ public struct Logger: Sendable {
 
     /// Logs a warning about an unexpected or recoverable condition.
     public func warning(
-        _ msg: String,
+        _ msg: @autoclosure () -> String,
         error: (any Error)? = nil,
-        metadata: [String: Any] = [:],
+        metadata: @autoclosure () -> [String: Any] = [:],
         file: StaticString = #fileID,
         function: StaticString = #function,
         line: Int = #line,
@@ -151,18 +139,10 @@ public struct Logger: Sendable {
     }
 
     /// Logs an error message for error conditions and failures.
-    /// - Parameters:
-    ///   - msg: The message to log
-    ///   - error: An optional error to capture with this record
-    ///   - metadata: Optional key-value pairs attached to the log record
-    ///   - file: The file where the log is called (automatically captured)
-    ///   - function: The function where the log is called (automatically captured)
-    ///   - line: The line number where the log is called (automatically captured)
-    ///   - column: The column where the log is called (automatically captured)
     public func error(
-        _ msg: String,
+        _ msg: @autoclosure () -> String,
         error: (any Error)? = nil,
-        metadata: [String: Any] = [:],
+        metadata: @autoclosure () -> [String: Any] = [:],
         file: StaticString = #fileID,
         function: StaticString = #function,
         line: Int = #line,
@@ -182,9 +162,9 @@ public struct Logger: Sendable {
 
     /// Logs a potential bug, such as a violated program invariant.
     public func fault(
-        _ msg: String,
+        _ msg: @autoclosure () -> String,
         error: (any Error)? = nil,
-        metadata: [String: Any] = [:],
+        metadata: @autoclosure () -> [String: Any] = [:],
         file: StaticString = #fileID,
         function: StaticString = #function,
         line: Int = #line,

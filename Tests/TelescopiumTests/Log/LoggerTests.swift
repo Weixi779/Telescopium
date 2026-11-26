@@ -90,6 +90,82 @@ struct LoggerTests {
         logger.error("Error message")
     }
 
+    @Test("Each accepted level evaluates its message and fields exactly once", arguments: LogLevel.allCases)
+    func lazyArguments(minimumLevel: LogLevel) {
+        let exporter = CaptureExporter()
+        let logger = Logger(recorder: LogRecorder(minimumLevel: minimumLevel, exporters: [exporter]))
+        var messages: [LogLevel] = []
+        var fields: [LogLevel] = []
+
+        func message(_ level: LogLevel) -> String {
+            messages.append(level)
+            return level.rawValue
+        }
+
+        func metadata(_ level: LogLevel) -> [String: Any] {
+            fields.append(level)
+            return ["level": level.rawValue]
+        }
+
+        logger.debug("level \(message(.debug))", metadata: metadata(.debug))
+        logger.info("level \(message(.info))", metadata: metadata(.info))
+        logger.warning("level \(message(.warning))", metadata: metadata(.warning))
+        logger.error("level \(message(.error))", metadata: metadata(.error))
+        logger.fault("level \(message(.fault))", metadata: metadata(.fault))
+
+        let accepted = LogLevel.allCases.filter { $0 >= minimumLevel }
+        #expect(messages == accepted)
+        #expect(fields == accepted)
+        #expect(exporter.records.map(\.level) == accepted)
+    }
+
+    @Test("An empty recorder skips record construction, enrichment, and redaction even for faults")
+    func silentRecorder() {
+        struct ProbeError: LocalizedError {
+            var errorDescription: String? {
+                Issue.record("Evaluated a filtered error description")
+                return "Filtered"
+            }
+        }
+
+        struct ProbeEnricher: LogEnricher {
+            func process(_ record: LogRecord) -> LogRecord {
+                if record.category == "Muted" { Issue.record("Enriched a filtered record") }
+                return record
+            }
+        }
+
+        let previous = Log.currentConfiguration
+        defer { Log.register(recorder: previous.recorder, enrichers: previous.enrichers) }
+        let redactor = TestRedactor(suffix: "_redacted")
+        let recorder = LogRecorder(redactors: [redactor], exporters: [])
+        Log.register(recorder: recorder, enrichers: [ProbeEnricher()])
+
+        var evaluations = 0
+        func evaluated() -> Int {
+            evaluations += 1
+            return evaluations
+        }
+        Logger(category: "Muted").fault("Call \(evaluated())", error: ProbeError(), metadata: ["call": evaluated()])
+        #expect(evaluations == 0)
+        #expect(redactor.calls.withLock { $0 } == 0)
+    }
+
+    @Test("Direct recording applies the same threshold before redaction")
+    func directRecordingThreshold() {
+        let source = CaptureExporter()
+        let logger = Logger(recorder: LogRecorder(exporters: [source]))
+        logger.debug("Debug")
+        logger.info("Info")
+
+        let destination = CaptureExporter()
+        let redactor = TestRedactor(suffix: "_redacted")
+        let recorder = LogRecorder(minimumLevel: .info, redactors: [redactor], exporters: [destination])
+        for record in source.records { recorder.record(record) }
+        #expect(redactor.calls.withLock { $0 } == 1)
+        #expect(destination.records.map(\.message) == ["Info_redacted"])
+    }
+
     @Test("A warning captures its caller and error through redaction and export")
     func testRecordContext() throws {
         let exporter = CaptureExporter()
@@ -180,15 +256,42 @@ struct LoggerTests {
 
         Log.register(recorder: firstRecorder)
         playback.info("Before")
-        Log.register(recorder: LogRecorder(exporters: [second]))
+        Log.register(recorder: LogRecorder(minimumLevel: .info, exporters: [second]))
+        playback.debug("Below the app threshold")
         playback.info("After")
-        fixed.info("Fixed")
+        fixed.debug("Fixed")
         Log.register(recorder: LogRecorder(exporters: []))
         playback.info("Silent")
         fixed.info("Still fixed")
 
         #expect(first.records.map(\.message) == ["Before", "Fixed", "Still fixed"])
         #expect(second.records.map(\.message) == ["After"])
+    }
+
+    @Test("Registration during interpolation applies to the next log call")
+    func registrationDuringEvaluation() {
+        let previous = Log.currentConfiguration
+        defer { Log.register(recorder: previous.recorder, enrichers: previous.enrichers) }
+
+        let first = CaptureExporter()
+        let second = CaptureExporter()
+        Log.register(recorder: LogRecorder(exporters: [first]), enrichers: [CurrentSpanEnricher()])
+        func replaceRecorder() -> String {
+            Log.register(recorder: LogRecorder(minimumLevel: .info, exporters: [second]))
+            return "Replaced"
+        }
+
+        let logger = Logger()
+        let context = SpanContext.root()
+        TraceScope.$current.withValue(context) {
+            logger.debug(replaceRecorder())
+            logger.debug("Filtered")
+            logger.info("Next")
+        }
+        #expect(first.records.map(\.message) == ["Replaced"])
+        #expect(first.records.first?.traceParent == context.traceParent)
+        #expect(second.records.map(\.message) == ["Next"])
+        #expect(second.records.first?.traceParent == nil)
     }
 
     @Test("A replacement can record while a call to the previous recorder is still in progress")
