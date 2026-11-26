@@ -30,15 +30,16 @@ public func withSpan<Result>(
     try await Trace.currentTracer.withSpan(name, ofKind: kind, isolation: isolation, operation)
 }
 
-extension Tracer {
+public extension Tracer {
+    /// Runs the operation with a new span from this tracer and ends it when the operation exits.
     func withSpan<Result>(
         _ name: String,
-        ofKind kind: SpanKind,
+        ofKind kind: SpanKind = .internal,
         _ operation: (any Telescopium.Span) throws -> Result,
     ) rethrows -> Result {
         let span = startSpan(name, ofKind: kind, parent: TraceScope.current)
         do {
-            let result = try TraceScope.$current.withValue(span.context) {
+            let result = try span.withCurrent {
                 try operation(span)
             }
             endSpan(span, throwing: nil)
@@ -49,15 +50,16 @@ extension Tracer {
         }
     }
 
+    /// Keeps this tracer's span current across suspension and preserves the caller's actor isolation.
     func withSpan<Result>(
         _ name: String,
-        ofKind kind: SpanKind,
-        isolation: isolated (any Actor)?,
+        ofKind kind: SpanKind = .internal,
+        isolation: isolated (any Actor)? = #isolation,
         _ operation: (any Telescopium.Span) async throws -> Result,
     ) async rethrows -> Result {
         let span = startSpan(name, ofKind: kind, parent: TraceScope.current)
         do {
-            let result = try await TraceScope.$current.withValue(span.context) {
+            let result = try await span.withCurrent(isolation: isolation) {
                 try await operation(span)
             }
             endSpan(span, throwing: nil)

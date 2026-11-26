@@ -52,6 +52,56 @@ struct WithSpanTests {
         TelescopiumTracer(exporter: exporter)
     }
 
+    @Test("Rebinding a page span parents the request and leaves the page open for later callbacks")
+    func pageRequest() throws {
+        let previous = Trace.currentTracer
+        defer { Trace.register(tracer: previous) }
+        Trace.register(tracer: tracer)
+
+        let pageExporter = CapturingSpanExporter()
+        let pageTracer = TelescopiumTracer(exporter: pageExporter)
+        let page = pageTracer.startSpan("Order details", ofKind: .internal, parent: nil)
+        let request = page.withCurrent {
+            withSpan("GET /orders/{id}", ofKind: .client) { $0.context }
+        }
+        #expect(TraceScope.current == nil)
+        let records = exporter.records
+        try #require(records.count == 1)
+        #expect(records[0].context == request)
+        #expect(records[0].parentSpanId == page.context.traceParent.spanId)
+        #expect(request.traceParent.traceId == page.context.traceParent.traceId)
+        #expect(pageExporter.records.isEmpty)
+
+        page.withCurrent { page.setMetadata(true, forKey: "refreshed") }
+        pageTracer.endSpan(page, throwing: nil)
+        #expect(pageExporter.records.map(\.context) == [page.context])
+        #expect(pageExporter.records.first?.metadata["refreshed"] == true)
+    }
+
+    @Test("An async callback keeps its page context across suspension and restores the outer span on throw")
+    @MainActor
+    func rebindAcrossSuspension() async throws {
+        let pageTracer = tracer
+        let page = pageTracer.startSpan("Order details", ofKind: .internal, parent: nil)
+        defer { pageTracer.endSpan(page, throwing: nil) }
+        let existing: any Span = page
+        try await withSpan("Refresh action") { outer in
+            do {
+                try await existing.withCurrent {
+                    await Task.yield()
+                    MainActor.assertIsolated()
+                    #expect(TraceScope.current == page.context)
+                    throw DraftError.invalid
+                }
+                Issue.record("Expected refresh to throw")
+            } catch DraftError.invalid {
+                #expect(TraceScope.current == outer.context)
+                #expect(exporter.records.isEmpty)
+            }
+        }
+        #expect(TraceScope.current == nil)
+    }
+
     @Test("A failed request exports its complete record once through the registered tracer")
     func exportFailedRequest() throws {
         let previous = Trace.currentTracer
