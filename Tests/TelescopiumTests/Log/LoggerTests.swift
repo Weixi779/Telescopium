@@ -124,47 +124,6 @@ struct LoggerTests {
         #expect(decoded.error == retry.error)
     }
 
-    @Test("Logger measure method")
-    func testLoggerMeasure() async throws {
-        let logger = Logger(category: "TestTimer")
-
-        let result = logger.measure("test_operation") {
-            usleep(10000) // 10ms
-            return 42
-        }
-
-        #expect(result == 42)
-    }
-
-    @Test("Logger measureAsync method")
-    func testLoggerMeasureAsync() async throws {
-        let logger = Logger(category: "TestTimer")
-
-        let result = await logger.measureAsync("test_async_operation") {
-            try? await Task.sleep(nanoseconds: 10_000_000) // 10ms
-            return "async_result"
-        }
-
-        #expect(result == "async_result")
-    }
-
-    @Test("Logger start/end interval")
-    func testLoggerInterval() async throws {
-        let logger = Logger(category: "TestTimer")
-
-        let state = logger.startInterval("manual_interval")
-        usleep(10000) // 10ms
-        logger.endInterval("manual_interval", state: state)
-    }
-
-    @Test("Logger event")
-    func testLoggerEvent() async throws {
-        let logger = Logger(category: "TestTimer")
-
-        logger.event("test_event")
-        logger.event("test_event_with_message", "This is a test message")
-    }
-
     @Test("Metadata overrides apply to one record from one logger")
     func testRecordMetadataOverrides() throws {
         let exporter = CaptureExporter()

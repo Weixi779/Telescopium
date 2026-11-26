@@ -1,11 +1,11 @@
 # Telescopium
 
-A Swift library for structured logging and performance measurement. Logs go to Apple's unified logging system by default.
+A Swift library for structured logging, scoped tracing, and performance measurement. Logs go to Apple's unified logging system by default.
 
 ## Features
 
 - 🪵 **Structured Logging** - Capture each message, its metadata, and its source location in a `LogRecord`
-- ⚡ **Performance Measurement** - Integrated `OSSignposter` for timing operations  
+- ⚡ **Instruments Signposts** - Record span intervals with an app-configured `OSSignposter`
 - 📊 **Log Export** - Forward structured records to a host-provided `LogExporter`
 - 🎯 **Category-Based Loggers** - Create loggers per feature or component
 - 🔒 **Privacy-Aware** - Apply redactors before export. The default OS exporter marks messages as private.
@@ -290,33 +290,6 @@ struct MaskingRedactor: LogRedactor {
 Log.register(recorder: LogRecorder(redactors: [MaskingRedactor()]))
 ```
 
-### Performance Measurement
-
-```swift
-import Telescopium
-
-let logger = Logger()
-
-// Measure synchronous operations
-let result = logger.measure("database_query") {
-    return database.fetchUsers()
-}
-
-// Measure asynchronous operations  
-let data = await logger.measureAsync("api_request") {
-    return await apiClient.getData()
-}
-
-// Manual timing for complex scenarios
-let logger = Logger(category: "Performance")
-let state = logger.startInterval("complex_operation")
-// ... complex logic ...
-logger.endInterval("complex_operation", state: state)
-
-// Event markers
-logger.event("checkpoint_reached", "Processing 50% complete")
-```
-
 ## Log Levels
 
 | Level   | Description | Persistence |
@@ -348,51 +321,49 @@ let cacheLogger = Logger(category: "Cache")
 
 ## Performance Analysis
 
-Telescopium integrates with **Instruments** for visual performance analysis:
+To record span durations in Instruments, register a tracer with a signposter at app startup.
 
-1. **Run your app with Instruments**
-2. **Select the "Logging" template**
-3. **Use signpost intervals** created by `measure()` methods
-4. **Analyze timing data** in the Timeline view
+```swift
+import os
+import Telescopium
 
-Example Instruments view:
+let signposter = OSSignposter(
+    subsystem: "com.example.shop",
+    category: .pointsOfInterest
+)
+Trace.register(tracer: TelescopiumTracer().signposted(by: signposter))
+
+try await withSpan("Submit order") { _ in
+    try await orders.submit()
+}
 ```
-Timeline: Your App Process
-├── Database Query     [■■■■░░░░░░] 45ms
-├── API Request        [░░■■■■■■░░] 120ms  
-└── Image Processing   [░░░░░■■■░░] 80ms
-```
+
+In the `os_signpost` instrument, look for intervals named `Span` under the configured subsystem and category. The interval message contains the operation name in plain text. For a standalone point on the timeline, the app can call `signposter.emitEvent("Checkpoint")` directly.
 
 ## Advanced Usage
 
 ### Async/Await Support
 
 ```swift
-let logger = Logger()
-
-// Perfect for measuring async operations
-let user = await logger.measureAsync("user_login") {
+let user = try await withSpan("user_login") { _ in
     try await authService.login(credentials)
 }
 
-// Measure Task execution
-await logger.measureAsync("background_processing") {
-    await Task.detached {
-        await processLargeDataSet()
-    }.value
+await withSpan("background_processing") { _ in
+    await processLargeDataSet()
 }
 ```
 
 ### Error Handling Best Practices
 
 ```swift
-func performNetworkRequest() async {
+func performNetworkRequest() async throws -> Data {
     let logger = Logger(category: "Network")
     
     logger.info("Starting API request")
     
     do {
-        let result = await logger.measureAsync("api_call") {
+        let result = try await withSpan("api_call", ofKind: .client) { _ in
             try await apiClient.fetchData()
         }
         logger.info("API request completed successfully")
@@ -412,7 +383,6 @@ func performNetworkRequest() async {
 #if DEBUG
 struct DebugMenu: View {
     @State private var showingLogExport = false
-    private let logger = Logger()
     
     var body: some View {
         List {
@@ -421,7 +391,7 @@ struct DebugMenu: View {
             }
             
             Button("Clear Cache") {
-                logger.measure("cache_clear") {
+                withSpan("cache_clear") { _ in
                     CacheManager.shared.clearAll()
                 }
             }
@@ -460,17 +430,10 @@ let logger1 = Logger(category: "Stuff")
 let logger2 = Logger(category: "Things")
 ```
 
-### 3. Measure Performance Strategically
+### 3. Trace Significant Operations
 ```swift
-// ✅ Good - Measure significant operations
-let logger = Logger(category: "Performance")
-let result = logger.measure("image_processing") {
+let result = withSpan("image_processing") { _ in
     return processImage(image)
-}
-
-// ❌ Avoid - Don't measure trivial operations
-let sum = logger.measure("addition") { 
-    return a + b  // Too fast to be meaningful
 }
 ```
 
@@ -478,9 +441,9 @@ let sum = logger.measure("addition") {
 
 ### Common Issues
 
-**Q: Performance measurements not showing in Instruments**  
-- A: Make sure you're using the Logging template in Instruments
-- A: Verify signposts are enabled in the Instruments settings
+**Q: Why are span intervals missing from Instruments?**
+
+Check that the app registered a signposted tracer before the operation began and that the recording includes the `os_signpost` instrument.
 
 ### Debug Tips
 

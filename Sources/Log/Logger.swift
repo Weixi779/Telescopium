@@ -6,15 +6,12 @@
 //  Copyright © 2026 Telescopium.
 //
 
-import os
-import OSLog
 import Foundation
 
-/// Creates structured records with source context and measures intervals with OSSignposter.
-public struct Logger: @unchecked Sendable {
+/// Creates structured log records with source context and sends them to the selected recorder.
+public struct Logger: Sendable {
     private static let subsystem = Bundle.main.bundleIdentifier ?? "app"
     public static let defaultCategory = "Default"
-    private let signposter: OSSignposter
     private let category: String
     private let explicitRecorder: (any LogRecording)?
 
@@ -28,10 +25,7 @@ public struct Logger: @unchecked Sendable {
         metadata: [String: Any] = [:],
         recorder: (any LogRecording)? = nil,
     ) {
-        let normalizedCategory = Logger.normalizedCategory(category)
-        let signpostLogger = os.Logger(subsystem: Self.subsystem, category: normalizedCategory)
-        self.signposter = OSSignposter(logger: signpostLogger)
-        self.category = normalizedCategory
+        self.category = Self.normalizedCategory(category)
         self.defaultMetadata = Metadata(converting: metadata)
         self.explicitRecorder = recorder
     }
@@ -206,81 +200,5 @@ public struct Logger: @unchecked Sendable {
             line: line,
             column: column,
         )
-    }
-
-    // MARK: - Timer/Performance Measurement
-
-    /// Starts a performance measurement interval that can be ended manually.
-    /// Use this for complex scenarios where you need fine-grained control over timing.
-    /// - Parameter name: A unique name for this measurement interval
-    /// - Returns: OSSignpostIntervalState that must be passed to endInterval()
-    /// - Note: Always pair with endInterval() to complete the measurement
-    public func startInterval(_ name: StaticString) -> OSSignpostIntervalState {
-        let intervalId = signposter.makeSignpostID()
-        let state = signposter.beginInterval(name, id: intervalId)
-        return state
-    }
-
-    /// Ends a performance measurement interval started with startInterval().
-    /// - Parameters:
-    ///   - name: The name of the interval (must exactly match the name used in startInterval)
-    ///   - state: The OSSignpostIntervalState returned from the corresponding startInterval() call
-    public func endInterval(_ name: StaticString, state: OSSignpostIntervalState) {
-        signposter.endInterval(name, state)
-    }
-
-    /// Measures the execution time of a synchronous closure.
-    /// This is the recommended way to measure performance for most use cases.
-    /// - Parameters:
-    ///   - name: A descriptive name for this measurement
-    ///   - operation: The closure whose execution time will be measured
-    /// - Returns: The result returned by the operation closure
-    /// - Throws: Re-throws any error thrown by the operation closure
-    public func measure<T>(_ name: StaticString, operation: () throws -> T) rethrows -> T {
-        let intervalId = signposter.makeSignpostID()
-        let state = signposter.beginInterval(name, id: intervalId)
-        let startTime = CFAbsoluteTimeGetCurrent()
-
-        defer {
-            let duration = CFAbsoluteTimeGetCurrent() - startTime
-            signposter.endInterval(name, state)
-            info("📊 \(name) completed in \(String(format: "%.2f", duration * 1000))ms")
-        }
-
-        return try operation()
-    }
-
-    /// Measures the execution time of an asynchronous closure.
-    /// Perfect for measuring async/await operations and Task execution times.
-    /// - Parameters:
-    ///   - name: A descriptive name for this measurement
-    ///   - operation: The async closure whose execution time will be measured
-    /// - Returns: The result returned by the operation closure
-    /// - Throws: Re-throws any error thrown by the operation closure
-    public func measureAsync<T>(_ name: StaticString, operation: () async throws -> T) async rethrows -> T {
-        let intervalId = signposter.makeSignpostID()
-        let state = signposter.beginInterval(name, id: intervalId)
-        let startTime = CFAbsoluteTimeGetCurrent()
-
-        defer {
-            let duration = CFAbsoluteTimeGetCurrent() - startTime
-            signposter.endInterval(name, state)
-            info("📊 \(name) completed in \(String(format: "%.2f", duration * 1000))ms")
-        }
-
-        return try await operation()
-    }
-
-    /// Emits an instant signpost event marker.
-    /// Useful for marking specific points in time during execution for debugging and profiling.
-    /// - Parameters:
-    ///   - name: A descriptive name for this event
-    ///   - message: Optional additional information about the event
-    public func event(_ name: StaticString, _ message: String = "") {
-        if message.isEmpty {
-            signposter.emitEvent(name)
-        } else {
-            signposter.emitEvent(name, "\(message, privacy: .private)")
-        }
     }
 }
