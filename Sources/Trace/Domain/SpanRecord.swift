@@ -22,4 +22,29 @@ public struct SpanRecord: Sendable {
     public let metadata: Metadata
     public let events: [SpanEvent]
     public let error: ErrorInfo?
+
+    /// Creates a completed record with an independently measured duration and wall-clock timestamps.
+    public init(
+        name: String,
+        kind: SpanKind,
+        context: SpanContext,
+        parentSpanId: SpanId? = nil,
+        startTime: Date,
+        endTime: Date,
+        duration: Duration,
+        metadata: Metadata = [:],
+        events: [SpanEvent] = [],
+        error: ErrorInfo? = nil,
+    ) {
+        self.name = name
+        self.kind = kind
+        self.context = context
+        self.parentSpanId = parentSpanId
+        self.startTime = startTime
+        self.endTime = endTime
+        self.duration = duration
+        self.metadata = metadata
+        self.events = events
+        self.error = error
+    }
 }

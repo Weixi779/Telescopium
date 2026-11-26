@@ -6,6 +6,7 @@
 //  Copyright © 2026 Telescopium.
 //
 
+import Foundation
 import Telescopium
 import Testing
 
@@ -32,5 +33,26 @@ struct TracePublicAPITests {
         let records = exporter.records
         #expect(records.map(\.name) == ["Read", "Edit"])
         #expect(records.map(\.kind) == [.internal, .internal])
+    }
+
+    @Test("An exporter fixture can construct a root record with independent wall and elapsed times")
+    func constructRecord() {
+        let start = Date(timeIntervalSince1970: 100)
+        let end = Date(timeIntervalSince1970: 99)
+        let context = SpanContext.root()
+        let record = SpanRecord(
+            name: "Request",
+            kind: .client,
+            context: context,
+            startTime: start,
+            endTime: end,
+            duration: .milliseconds(10),
+        )
+
+        #expect(record.context == context)
+        #expect(record.startTime == start && record.endTime == end)
+        #expect(record.duration == .milliseconds(10))
+        #expect(record.parentSpanId == nil && record.error == nil)
+        #expect(record.metadata.isEmpty && record.events.isEmpty)
     }
 }
