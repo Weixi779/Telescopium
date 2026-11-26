@@ -13,6 +13,7 @@ import Foundation
 public struct TraceState: Sendable, Hashable {
     public struct Entry: Sendable, Hashable {
         // W3C permits a simple vendor key or a tenant@system key.
+        // Regex<Substring> is not Sendable. A computed property keeps the matcher local to each use.
         private static var keyPattern: Regex<Substring> {
             #/[a-z][a-z0-9_*/-]{0,255}|[a-z0-9][a-z0-9_*/-]{0,240}@[a-z][a-z0-9_*/-]{0,13}/#
         }

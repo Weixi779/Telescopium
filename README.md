@@ -1,444 +1,83 @@
 # Telescopium
 
-A Swift library for structured logging, scoped tracing, and performance measurement. Logs go to Apple's unified logging system by default.
+[![CI](https://github.com/Weixi779/Telescopium/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Weixi779/Telescopium/actions/workflows/ci.yml)
+![Platforms](https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS%20%7C%20watchOS-blue)
+![Swift](https://img.shields.io/badge/Swift-6.2%2B-orange)
+![Swift Package Manager](https://img.shields.io/badge/SwiftPM-supported-brightgreen)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
-## Features
+English | [简体中文](README_CN.md)
 
-- 🪵 **Structured Logging** - Capture each message, its metadata, and its source location in a `LogRecord`
-- ⚡ **Instruments Signposts** - Record span intervals with an app-configured `OSSignposter`
-- 📊 **Log Export** - Forward structured records to a host-provided `LogExporter`
-- 🎯 **Category-Based Loggers** - Create loggers per feature or component
-- 🔒 **Privacy-Aware** - Apply redactors before export. The default OS exporter marks messages as private.
-- 🧵 **Thread-Safe** - Safe for concurrent use across multiple threads
-- 📱 **iOS 16+** - iOS, macOS, tvOS, and watchOS support
+Structured logging and scoped tracing for Swift apps on Apple platforms. The package ships one library with zero third-party dependencies.
 
-## Requirements
-
-- **iOS 16.0+** / **macOS 13.0+** / **tvOS 16.0+** / **watchOS 9.0+**
-- Swift tools 6.2+ (Xcode 26+)
+- Log to Apple's unified log by default, or forward structured records to an app-owned exporter.
+- Trace synchronous and asynchronous work with `withSpan`, including nested requests and operations that throw.
+- Record span intervals in Instruments with an `OSSignposter` configured by the app.
 
 ## Installation
 
-### Swift Package Manager
+Requires Swift tools 6.2 or later (Xcode 26+) and iOS 16+, macOS 13+, tvOS 16+, or watchOS 9+.
 
-To use the current checkout, add it as a local package in Xcode or declare the package and its product in your manifest.
+To use the 0.1.0 release once tagged, add the repository in Xcode under **Package Dependencies**. In a SwiftPM manifest, use the following package dependency.
 
 ```swift
-// Package dependency
-.package(path: "../Telescopium")
+.package(url: "https://github.com/Weixi779/Telescopium.git", from: "0.1.0")
+```
 
-// Target dependency
+To use a local checkout before the tag is available, use `.package(path: "../Telescopium")`. Both forms use the same target dependency.
+
+```swift
 .product(name: "Telescopium", package: "Telescopium")
 ```
 
-## Trace Context Core
+## Quick start
 
-`TraceParent` generates, validates, and serializes the W3C Trace Context version `00` format.
-The tracer manages the span lifecycle. The network layer chooses when to propagate the header.
+Paste this into a Swift executable's `main.swift`. In an app, register the exporter once at startup and keep the logger alongside the feature that uses it.
 
 ```swift
+import Foundation
 import Telescopium
 
-// Uses the system random source; version and flags default to 00.
-let generated = TraceParent.random()
-let header = generated.headerValue
-
-// Strictly parses a complete lowercase version 00 header.
-if let parsed = TraceParent(headerValue: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01") {
-    let explicit = TraceParent(
-        traceId: parsed.traceId,
-        spanId: parsed.spanId,
-        flags: 0
-    )
-    print(explicit.headerValue)
-}
-
-// A fixed seed reproduces the sequence for tests and debugging.
-var generator = SeededRandomNumberGenerator(seed: 42)
-let reproducible = TraceParent.random(using: &generator)
-let next = TraceParent.random(using: &generator)
-```
-
-`TraceParent`, `TraceId`, and `SpanId` conform to `Sendable`, `Hashable` (including `Equatable`), and `Codable`.
-They encode as single strings and reject invalid strings during decoding.
-Identifiers preserve leading zeros and reject all-zero values. Header parsing rejects unsupported versions,
-uppercase hexadecimal, extra fields, and surrounding whitespace. Raw flag bytes are preserved.
-
-The built-in tracer starts a root with the sampled flag clear and propagates a parent's flags to its children. Its own recording is controlled by the configured span exporter.
-
-The seeded generator uses SplitMix64 and is not cryptographically secure. Use the default system random
-source for production identifiers; restarting a fixed seed repeats identifiers. A trace identifier consumes
-two random words (high, then low), followed by one word for the span identifier; all-zero identifiers are retried.
-
-## Quick Start
-
-### Scoped Tracing
-
-`withSpan` starts a span, makes its context available through `TraceScope.current`, and ends it when the operation returns or throws. Both synchronous and asynchronous operations use the same API.
-
-```swift
-let order = try await withSpan("Submit order") { span in
-    span.setMetadata("checkout", forKey: "source")
-    return try await orders.submit()
-}
-```
-
-The built-in `TelescopiumTracer` creates a `TelescopiumSpan` for each operation. By default, the span carries only its context for propagation. When you supply a `SpanExporter`, the tracer also records timing, metadata, and events. The first end creates one `SpanRecord` and delivers it synchronously to the exporter on the caller's thread.
-
-```swift
 struct ConsoleSpanExporter: SpanExporter {
     func export(_ record: SpanRecord) {
         print(record.name, record.duration)
     }
 }
 
-let exporter = ConsoleSpanExporter()
-Trace.register(tracer: TelescopiumTracer(exporter: exporter))
-```
-
-Calls to the exporter for different spans can overlap. The global `withSpan` looks up the app's registered tracer when each span starts. Call `tracer.withSpan` to use an injected tracer directly. Both forms finish the span with the tracer that created it.
-
-When a screen spans several callbacks, the screen owner can store the span and its matching end operation. An initializer taking `some Tracer` keeps the tracer's associated span type available when it builds that operation. This also works when the app passes an `any Tracer` or a tracer decorated with `signposted(by:)`.
-
-```swift
-final class OrderDetailsModel {
-    let page: any Span
-    let close: () -> Void
-
-    init(tracer: some Tracer) {
-        let page = tracer.startSpan("Order details", ofKind: .internal, parent: TraceScope.current)
-        self.page = page
-        close = { tracer.endSpan(page, throwing: nil) }
-    }
-}
-
-let model = OrderDetailsModel(tracer: tracer)
-
-// Later, in the refresh action.
-let order = try await model.page.withCurrent {
-    try await withSpan("GET /orders/{id}", ofKind: .client) { _ in
-        try await orders.fetch(id)
-    }
-}
-
-// When the screen closes.
-model.close()
-```
-
-### Basic Logging
-
-```swift
-import Telescopium
-
-let logger = Logger()
-logger.debug("App started")
-logger.info("User logged in successfully")
-logger.warning("Playback timed out, retrying")
-logger.error("Failed to load data", error: error)
-logger.fault("Player entered the playing state without a current item")
-
-// Instance interface (for custom categories)
-let networkLogger = Logger(category: "Network")
-networkLogger.info("API request started")
-```
-
-### Structured Metadata
-
-```swift
-import Telescopium
-
-let logger = Logger(
-    category: "Auth",
-    metadata: ["module": "Auth", "source": "app"]
-)
-logger.info(
-    "Login succeeded",
-    metadata: [
-        "userId": "1234",
-        "source": "web",
-        "attempts": [["status": 200, "duration": 1.0]]
-    ]
-)
-```
-
-Each record inherits the logger's metadata. A call overrides matching top-level keys for that record, including entire objects and arrays. Pass Swift variables and existing dictionaries directly as `[String: Any]`. Use `NSNull()` or `MetadataValue.null` for an explicit null. The logger normalizes fields to `MetadataValue` before redaction and export. It skips unsupported values (including out-of-range unsigned integers and Decimal), keeps other fields and array elements in order, and reports the skipped location in debug builds.
-
-### Register an Application Recorder
-
-To send records to a backend, implement `LogExporter` or `SpanExporter` in the app or a separate package. Register the log exporter with `LogRecorder` and the span exporter with `TelescopiumTracer`.
-
-```swift
-import Foundation
-import Telescopium
-
-final class RemoteExporter: LogExporter {
-    func export(_ record: LogRecord) {
-        // Forward to your remote logging backend.
-    }
-}
-
-final class TokenRedactor: LogRedactor {
-    let policy: RedactionPolicy = .when {
-        ProcessInfo.processInfo.environment["ENV"] == "prod"
-    }
-    
-    func process(_ record: LogRecord) -> LogRecord {
-        var result = record
-        result.metadata.removeValue(forKey: "token")
-        return result
-    }
-}
-
-// App startup
-Log.register(
-    recorder: LogRecorder(
-        redactors: [TokenRedactor()],
-        exporters: [OSLogExporter(), RemoteExporter()]
-    )
-)
-
-// Playback
-let logger = Logger(category: "Playback")
-logger.info("Play tapped")
-```
-
-Each log call takes one snapshot of the application configuration. After merging metadata, the logger runs the registered enrichers synchronously in order. A logger created with `Logger(category: "Playback", recorder: recorder)` runs the same enrichers and sends the result to its own recorder. Other loggers use the recorder from the snapshot.
-
-`LogRecorder` applies each enabled redactor once, in order, then sends the final record to every exporter. Both `LogEnricher` and `LogRedactor` inherit `LogRecordProcessor`. A host can also use `[any LogRecordProcessor]` directly and pass each returned record to the next processor.
-
-With no registration, the application uses `LogRecorder()`, which exports to `OSLogExporter`. Its console text contains the message, optional error type and description, and source location. Structured exporters can also use the record's metadata and trace parent. Register `LogRecorder(exporters: [])` to silence application logging, or register `LogRecorder()` to restore the default output.
-
-### Correlate Logs with the Current Span
-
-Define this enricher in your app target and register it alongside your recorder at startup.
-
-```swift
-import Telescopium
-
-struct AppTraceEnricher: LogEnricher {
-    func process(_ record: LogRecord) -> LogRecord {
-        var result = record
-        result.traceParent = record.traceParent ?? TraceScope.current?.traceParent
-        return result
-    }
-}
-
-Log.register(recorder: LogRecorder(), enrichers: [AppTraceEnricher()])
+Trace.register(tracer: TelescopiumTracer(exporter: ConsoleSpanExporter()))
 
 let logger = Logger(category: "Playback")
-withSpan("Play") { _ in
-    logger.info("Play tapped")
+let payload = Data(#"["Introduction", "Interview"]"#.utf8)
+
+try withSpan("Decode chapters") { _ in
+    let chapters = try JSONDecoder().decode([String].self, from: payload)
+    logger.info("Loaded chapters", metadata: ["count": chapters.count])
 }
 ```
 
-The enricher captures the active span when `logger.info` creates the record. A queued record keeps that parent after the span ends. Outside a span the field stays empty, and a parent set by an earlier enricher takes precedence.
+The log goes to Apple's unified log. In Console, enable Info messages and filter by category `Playback`. The default exporter marks the text as private, so visibility depends on the system logging configuration. When the operation ends, the span exporter prints `Decode chapters` and its elapsed duration to standard output.
 
-### Redaction-Only Example
+To attach the active span ID to each log record, register the app enricher from the [log correlation example](docs/logging.md#correlate-logs-with-the-current-span).
 
-```swift
-import Telescopium
+## Documentation
 
-struct MaskingRedactor: LogRedactor {
-    let policy: RedactionPolicy = .always
-    
-    func process(_ record: LogRecord) -> LogRecord {
-        var result = record
-        result.metadata = record.metadata.mapValues { _ in "***" }
-        return result
-    }
-}
+- [Logging](docs/logging.md) — Set category and metadata, enrich or redact a record, and register destinations.
+- [Tracing](docs/tracing.md) — Trace requests and screen lifetimes, propagate W3C headers, and inspect intervals in Instruments.
+- [Design decisions](docs/design.md) — Understand who owns configuration, span lifetime, and delivery.
 
-// Send masked records to the default OS exporter.
-Log.register(recorder: LogRecorder(redactors: [MaskingRedactor()]))
-```
+## Development
 
-## Log Levels
-
-| Level   | Description | Apple unified log type |
-|---------|-------------|-------------|
-| `debug` | Detailed debugging information | `.debug` |
-| `info`  | General informational messages | `.info` |
-| `warning` | Unexpected or recoverable conditions | `.error` |
-| `error` | Error conditions and failures | `.error` |
-| `fault` | Potential bugs, such as a violated program invariant | `.fault` |
-
-In both Debug and Release, the recorder receives the original `LogLevel`. The system logging configuration controls which unified log messages are enabled and retained.
-
-## Categories
-
-### Suggested Categories
-
-```swift
-// Use readable category strings for common use cases
-let standardLogger = Logger()                        // General app logs
-let networkLogger = Logger(category: "Network")      // Network operations
-```
-
-### Custom Categories
-
-```swift
-// Create custom categories for specific components
-let databaseLogger = Logger(category: "Database")
-let authLogger = Logger(category: "Authentication")
-let cacheLogger = Logger(category: "Cache")
-```
-
-## Performance Analysis
-
-To record span durations in Instruments, register a tracer with a signposter at app startup.
-
-```swift
-import os
-import Telescopium
-
-let signposter = OSSignposter(
-    subsystem: "com.example.shop",
-    category: .pointsOfInterest
-)
-Trace.register(tracer: TelescopiumTracer().signposted(by: signposter))
-
-try await withSpan("Submit order") { _ in
-    try await orders.submit()
-}
-```
-
-In the `os_signpost` instrument, look for intervals named `Span` under the configured subsystem and category. The interval message contains the operation name in plain text. For a standalone point on the timeline, the app can call `signposter.emitEvent("Checkpoint")` directly.
-
-## Advanced Usage
-
-### Async/Await Support
-
-```swift
-let user = try await withSpan("user_login") { _ in
-    try await authService.login(credentials)
-}
-
-await withSpan("background_processing") { _ in
-    await processLargeDataSet()
-}
-```
-
-### Error Handling Best Practices
-
-```swift
-func performNetworkRequest() async throws -> Data {
-    let logger = Logger(category: "Network")
-    
-    logger.info("Starting API request")
-    
-    do {
-        let result = try await withSpan("api_call", ofKind: .client) { _ in
-            try await apiClient.fetchData()
-        }
-        logger.info("API request completed successfully")
-        return result
-    } catch {
-        logger.error("API request failed", error: error)
-        throw error
-    }
-}
-```
-
-## Integration Examples
-
-### Debug Menu Integration
-
-```swift
-#if DEBUG
-struct DebugMenu: View {
-    @State private var showingLogExport = false
-    
-    var body: some View {
-        List {
-            Button("Export Logs") {
-                showingLogExport = true
-            }
-            
-            Button("Clear Cache") {
-                withSpan("cache_clear") { _ in
-                    CacheManager.shared.clearAll()
-                }
-            }
-        }
-        .sheet(isPresented: $showingLogExport) {
-            LogExportView()
-        }
-    }
-}
-#endif
-```
-
-## Best Practices
-
-### 1. Choose Appropriate Log Levels
-```swift
-// ✅ Good
-let logger = Logger()
-logger.debug("Entering function with parameters: \(params)")
-logger.info("User completed onboarding")                       // Important events  
-logger.error("Network request failed", error: error)          // Actionable errors
-
-// ❌ Avoid
-logger.info("Loop iteration \(i)")                            // Too verbose
-logger.error("User tapped button")                            // Not an error
-```
-
-### 2. Use Meaningful Categories
-```swift
-// ✅ Good
-let authLogger = Logger(category: "Authentication") 
-let paymentLogger = Logger(category: "Payment")
-
-// ❌ Avoid  
-let logger1 = Logger(category: "Stuff")
-let logger2 = Logger(category: "Things")
-```
-
-### 3. Trace Significant Operations
-```swift
-let result = withSpan("image_processing") { _ in
-    return processImage(image)
-}
-```
-
-## Troubleshooting
-
-### Common Issues
-
-**Q: Why are span intervals missing from Instruments?**
-
-Check that the app registered a signposted tracer before the operation began and that the recording includes the `os_signpost` instrument.
-
-### Debug Tips
-
-```swift
-#if DEBUG
-// Enable verbose logging in debug builds
-Logger().debug("Detailed debug information here")
-
-// Export logs for debugging
-if ProcessInfo.processInfo.arguments.contains("--export-logs") {
-    exportLogsForDebugging()
-}
-#endif
-```
-
-## Contributing
-
-Install the development tools with `brew install swiftformat swiftlint`. Run these commands from the package root as needed.
+With SwiftFormat and SwiftLint installed, run these checks from the package root.
 
 ```sh
-swiftformat . --lint    # Check formatting
-swiftformat .           # Apply formatting
-swiftlint lint --strict # Check for lint violations
+swift test
+swift test -c release
+swiftformat --lint Package.swift Sources Tests
+swiftlint lint --strict Package.swift Sources Tests
 ```
+
+The [CI workflow](.github/workflows/ci.yml) pins the development tools and builds the library for iOS, tvOS, and watchOS in addition to running the tests on macOS.
 
 ## License
 
-This project is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full terms and [NOTICE](NOTICE) for attribution.
-
-## Acknowledgments
-
-- Built on Apple's excellent `os.Logger` and `OSSignposter` frameworks
-- Inspired by the need for simple, powerful logging in iOS development
-- Thanks to the Swift community for feedback and contributions
+Licensed under the [Apache License, Version 2.0](LICENSE). See [NOTICE](NOTICE) for attribution.
