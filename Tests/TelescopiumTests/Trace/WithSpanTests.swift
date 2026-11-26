@@ -12,14 +12,6 @@ import Testing
 
 private enum DraftError: Error { case invalid }
 
-private struct CapturingSpanExporter: SpanExporter {
-    let records = LockedValue<[SpanRecord]>([])
-
-    func export(_ record: SpanRecord) {
-        records.withLock { $0.append(record) }
-    }
-}
-
 private struct ScopeProbeExporter: LogExporter {
     let observations = LockedValue<[(record: LogRecord, parent: TraceParent?)]>([])
 
@@ -54,21 +46,18 @@ private struct TestTracer: Tracer {
 
 @Suite(.serialized)
 struct WithSpanTests {
-    private let finished = LockedValue<[SpanRecord]>([])
+    private let exporter = CapturingSpanExporter()
 
     private var tracer: TelescopiumTracer {
-        TelescopiumTracer { [finished] record in
-            finished.withLock { $0.append(record) }
-        }
+        TelescopiumTracer(exporter: exporter)
     }
 
     @Test("A failed request exports its complete record once through the registered tracer")
     func exportFailedRequest() throws {
         let previous = Trace.currentTracer
         defer { Trace.register(tracer: previous) }
-        let exporter = CapturingSpanExporter()
-        let tracer = TelescopiumTracer(onFinish: exporter.export)
-        Trace.register(tracer: tracer)
+        let requestTracer = tracer
+        Trace.register(tracer: requestTracer)
 
         let parent = SpanContext.root()
         let timeout = URLError(.timedOut)
@@ -87,10 +76,10 @@ struct WithSpanTests {
         }
         let elapsed = started.duration(to: .now)
         let span = try #require(request)
-        #expect(exporter.records.withLock { $0.count } == 1)
-        tracer.endSpan(span, throwing: nil)
+        #expect(exporter.records.count == 1)
+        requestTracer.endSpan(span, throwing: nil)
 
-        let records = exporter.records.withLock { $0 }
+        let records = exporter.records
         try #require(records.count == 1)
         let record = records[0]
         #expect(record.name == "POST /orders")
@@ -115,7 +104,7 @@ struct WithSpanTests {
         }
 
         span.addEvent(SpanEvent("Late"))
-        let record = try #require(finished.withLock { $0.first })
+        let record = try #require(exporter.records.first)
         #expect(record.events == [first, second])
         #expect(record.metadata.isEmpty)
     }
@@ -203,13 +192,13 @@ struct WithSpanTests {
             #expect(TraceScope.current == span.context)
             let second = tracer.withSpan("Write", ofKind: .internal) { $0.context }
             #expect(first.traceParent.spanId != second.traceParent.spanId)
-            #expect(finished.withLock { $0.map(\.context) } == [first, second])
+            #expect(exporter.records.map(\.context) == [first, second])
             span.setMetadata(3, forKey: "bytes")
             return span
         }
         #expect(TraceScope.current == nil)
         root.setMetadata(9, forKey: "bytes")
-        let records = finished.withLock { $0 }
+        let records = exporter.records
         #expect(records.map(\.name) == ["Prepare", "Write", "Save draft"])
         let parent = try #require(records.last)
         #expect(parent.parentSpanId == nil)
@@ -228,7 +217,7 @@ struct WithSpanTests {
                 throw DraftError.invalid
             }
         }
-        let record = try #require(finished.withLock { $0.first })
+        let record = try #require(exporter.records.first)
         #expect(record.error == ErrorInfo(DraftError.invalid))
         #expect(TraceScope.current == nil)
     }
@@ -243,7 +232,7 @@ struct WithSpanTests {
             tracer.withSpan("Import", ofKind: .consumer) { _ in }
             #expect(TraceScope.current == remote)
         }
-        let child = try #require(finished.withLock { $0.first })
+        let child = try #require(exporter.records.first)
         #expect(child.name == "Import")
         #expect(child.kind == .consumer)
         #expect(child.parentSpanId == parent.spanId)
@@ -300,7 +289,7 @@ struct WithSpanTests {
             } catch DraftError.invalid {
                 #expect(TraceScope.current == root.context)
             }
-            let record = try #require(finished.withLock { $0.first })
+            let record = try #require(exporter.records.first)
             #expect(record.parentSpanId == root.context.traceParent.spanId)
             #expect(record.error == ErrorInfo(DraftError.invalid))
             return draft

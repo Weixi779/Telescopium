@@ -6,7 +6,7 @@
 //  Copyright © 2026 Telescopium.
 //
 
-/// Receives completed span records through a tracer's finish callback.
+/// Receives completed span records from a tracer.
 public protocol SpanExporter: Sendable {
     /// Called synchronously on the thread ending the span. Calls for different spans can overlap.
     func export(_ record: SpanRecord)

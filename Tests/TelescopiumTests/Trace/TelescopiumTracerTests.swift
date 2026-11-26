@@ -17,12 +17,20 @@ struct TelescopiumTracerTests {
         var errorDescription: String? { describe() }
     }
 
+    private struct BlockingExporter: SpanExporter {
+        let entered = DispatchSemaphore(value: 0)
+        let secondEndReturned = DispatchSemaphore(value: 0)
+
+        func export(_ record: SpanRecord) {
+            entered.signal()
+            #expect(secondEndReturned.wait(timeout: .now() + 5) == .success)
+        }
+    }
+
     @Test("Concurrent end calls deliver exactly one completed record")
     func concurrentEnd() throws {
-        let finished = LockedValue<[SpanRecord]>([])
-        let tracer = TelescopiumTracer { record in
-            finished.withLock { $0.append(record) }
-        }
+        let exporter = CapturingSpanExporter()
+        let tracer = TelescopiumTracer(exporter: exporter)
         let span = tracer.startSpan("Request", ofKind: .client, parent: nil)
         let response = SpanEvent("Response received")
         span.setMetadata(200, forKey: "status")
@@ -35,7 +43,7 @@ struct TelescopiumTracerTests {
         span.addEvent(SpanEvent("Late event"))
         tracer.endSpan(span, throwing: nil)
 
-        let records = finished.withLock { $0 }
+        let records = exporter.records
         try #require(records.count == 1)
         let record = records[0]
         #expect(record.context == span.context)
@@ -48,12 +56,12 @@ struct TelescopiumTracerTests {
         #expect(record.error == nil)
     }
 
-    @Test("Concurrent ends without a callback close the span without describing its error")
-    func concurrentEndWithoutCallback() {
+    @Test("Concurrent ends without an exporter close the span without describing its error")
+    func concurrentEndWithoutExporter() {
         let tracer = TelescopiumTracer()
         let span = tracer.startSpan("Request", ofKind: .client, parent: nil)
         let error = DescribedError {
-            Issue.record("A tracer without a finish callback evaluated errorDescription")
+            Issue.record("A tracer without an exporter evaluated errorDescription")
             return "Offline"
         }
 
@@ -83,30 +91,26 @@ struct TelescopiumTracerTests {
         #expect(record.duration <= startInstant.duration(to: .now))
     }
 
-    @Test("A second end returns while the first finish callback is running")
-    func finishCallbackRunsOutsideSpanLock() throws {
-        let enteredCallback = DispatchSemaphore(value: 0)
-        let secondEndReturned = DispatchSemaphore(value: 0)
+    @Test("A second end returns while the exporter is running")
+    func exporterRunsOutsideSpanLock() throws {
+        let exporter = BlockingExporter()
         let firstEndReturned = DispatchSemaphore(value: 0)
-        let tracer = TelescopiumTracer { _ in
-            enteredCallback.signal()
-            #expect(secondEndReturned.wait(timeout: .now() + 5) == .success)
-        }
+        let tracer = TelescopiumTracer(exporter: exporter)
         let span = tracer.startSpan("Request", ofKind: .client, parent: nil)
         DispatchQueue.global().async {
             tracer.endSpan(span, throwing: nil)
             firstEndReturned.signal()
         }
-        try #require(enteredCallback.wait(timeout: .now() + 5) == .success)
+        try #require(exporter.entered.wait(timeout: .now() + 5) == .success)
         tracer.endSpan(span, throwing: nil)
-        secondEndReturned.signal()
+        exporter.secondEndReturned.signal()
         #expect(firstEndReturned.wait(timeout: .now() + 5) == .success)
     }
 
     @Test("Only the first end describes its error, after freezing and unlocking the span")
     func errorConversionRunsOutsideSpanLock() throws {
-        let finished = LockedValue<[SpanRecord]>([])
-        let tracer = TelescopiumTracer { record in finished.withLock { $0.append(record) } }
+        let exporter = CapturingSpanExporter()
+        let tracer = TelescopiumTracer(exporter: exporter)
         let span = tracer.startSpan("Request", ofKind: .client, parent: nil)
         let describing = DispatchSemaphore(value: 0)
         let repeatedEndReturned = DispatchSemaphore(value: 0)
@@ -131,7 +135,7 @@ struct TelescopiumTracerTests {
         repeatedEndReturned.signal()
 
         try #require(delivered.wait(timeout: .now() + 5) == .success)
-        let records = finished.withLock { $0 }
+        let records = exporter.records
         try #require(records.count == 1)
         #expect(records[0].error?.message == "Offline")
         #expect(records[0].events.isEmpty)

@@ -8,7 +8,7 @@
 
 import Foundation
 
-/// A snapshot of a completed `TelescopiumSpan`, delivered to the tracer's finish callback.
+/// A snapshot of a completed span for export.
 public struct SpanRecord: Sendable {
     public let name: String
     public let kind: SpanKind

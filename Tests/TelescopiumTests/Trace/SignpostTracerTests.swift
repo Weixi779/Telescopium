@@ -43,8 +43,8 @@ struct SignpostTracerTests {
 
     @Test(arguments: [OSSignposter.disabled, OSSignposter(subsystem: "TelescopiumTests", category: .pointsOfInterest)])
     func overlappingSpansForwardToTheirOriginalRecords(signposter: OSSignposter) throws {
-        let ended = LockedValue<[SpanRecord]>([])
-        let base = TelescopiumTracer { record in ended.withLock { $0.append(record) } }
+        let exporter = CapturingSpanExporter()
+        let base = TelescopiumTracer(exporter: exporter)
         let tracer = base.signposted(by: signposter)
         let parent = SpanContext.root()
         let first = tracer.startSpan("Request", ofKind: .client, parent: parent)
@@ -55,7 +55,7 @@ struct SignpostTracerTests {
         tracer.endSpan(second, throwing: RequestError.cancelled)
         tracer.endSpan(first, throwing: nil)
 
-        let records = ended.withLock { $0 }
+        let records = exporter.records
         try #require(records.count == 2)
         #expect(records.map(\.context) == [second.context, first.context])
         #expect(first.context != second.context)
