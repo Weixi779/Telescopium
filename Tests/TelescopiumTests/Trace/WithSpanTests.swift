@@ -12,6 +12,14 @@ import Testing
 
 private enum DraftError: Error { case invalid }
 
+private struct CapturingSpanExporter: SpanExporter {
+    let records = LockedValue<[SpanRecord]>([])
+
+    func export(_ record: SpanRecord) {
+        records.withLock { $0.append(record) }
+    }
+}
+
 private struct ScopeProbeExporter: LogExporter {
     let observations = LockedValue<[(record: LogRecord, parent: TraceParent?)]>([])
 
@@ -52,6 +60,48 @@ struct WithSpanTests {
         TelescopiumTracer { [finished] record in
             finished.withLock { $0.append(record) }
         }
+    }
+
+    @Test("A failed request exports its complete record once through the registered tracer")
+    func exportFailedRequest() throws {
+        let previous = Trace.currentTracer
+        defer { Trace.register(tracer: previous) }
+        let exporter = CapturingSpanExporter()
+        let tracer = TelescopiumTracer(onFinish: exporter.export)
+        Trace.register(tracer: tracer)
+
+        let parent = SpanContext.root()
+        let timeout = URLError(.timedOut)
+        let sent = SpanEvent("Request sent", metadata: ["attempt": 1])
+        var request: TelescopiumSpan?
+        let started = ContinuousClock.now
+        TraceScope.$current.withValue(parent) {
+            #expect(throws: timeout) {
+                try withSpan("POST /orders", ofKind: .client) { span in
+                    request = span as? TelescopiumSpan
+                    span.setMetadata("checkout", forKey: "feature")
+                    span.addEvent(sent)
+                    throw timeout
+                }
+            }
+        }
+        let elapsed = started.duration(to: .now)
+        let span = try #require(request)
+        #expect(exporter.records.withLock { $0.count } == 1)
+        tracer.endSpan(span, throwing: nil)
+
+        let records = exporter.records.withLock { $0 }
+        try #require(records.count == 1)
+        let record = records[0]
+        #expect(record.name == "POST /orders")
+        #expect(record.kind == .client)
+        #expect(record.context == span.context)
+        #expect(record.context.traceParent.traceId == parent.traceParent.traceId)
+        #expect(record.parentSpanId == parent.traceParent.spanId)
+        #expect(record.duration >= .zero && record.duration <= elapsed)
+        #expect(record.metadata == ["feature": "checkout"])
+        #expect(record.events == [sent])
+        #expect(record.error == ErrorInfo(timeout))
     }
 
     @Test("Repeated events keep their timestamps and metadata in recording order until the span ends")

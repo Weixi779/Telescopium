@@ -82,12 +82,17 @@ let order = try await withSpan("Submit order") { span in
 The built-in `TelescopiumTracer` creates a `TelescopiumSpan` for each operation. By default, ending the span only closes its recording. When you supply `onFinish`, the first end creates one `SpanRecord` and delivers it synchronously on the caller's thread.
 
 ```swift
-Trace.register(tracer: TelescopiumTracer { record in
-    print(record.name, record.duration)
-})
+struct ConsoleSpanExporter: SpanExporter {
+    func export(_ record: SpanRecord) {
+        print(record.name, record.duration)
+    }
+}
+
+let exporter = ConsoleSpanExporter()
+Trace.register(tracer: TelescopiumTracer(onFinish: exporter.export))
 ```
 
-An app can also register its own `Tracer`. Each new span uses the current registration and finishes with the tracer that created it.
+Calls to the exporter for different spans can overlap. An app can also register its own `Tracer`. Each new span uses the current registration and finishes with the tracer that created it.
 
 ### Basic Logging
 
