@@ -48,6 +48,14 @@ private struct TestRedactor: LogRedactor {
     }
 }
 
+private struct CurrentSpanEnricher: LogEnricher {
+    func process(_ record: LogRecord) -> LogRecord {
+        var result = record
+        result.traceParent = record.traceParent ?? TraceScope.current?.traceParent
+        return result
+    }
+}
+
 private struct SpanIDEnricher: LogEnricher {
     func process(_ record: LogRecord) -> LogRecord {
         var result = record
@@ -276,36 +284,36 @@ struct LoggerTests {
             recorder: CallbackRecorder { record in pending.withLock { $0.append(record) } },
         )
         let recorder = LogRecorder(exporters: [appRecords])
-        Log.register(recorder: recorder, enrichers: [TraceCorrelationEnricher(), SpanIDEnricher()])
+        Log.register(recorder: recorder, enrichers: [CurrentSpanEnricher(), SpanIDEnricher()])
 
-        let parent = TraceParent.random()
-        let child = TraceParent(traceId: parent.traceId, spanId: .random(), flags: parent.flags)
-        TraceScope.$current.withValue(SpanContext(traceParent: parent)) {
-            TraceScope.$current.withValue(SpanContext(traceParent: child)) {
+        let parent = SpanContext.root()
+        let child = parent.child()
+        TraceScope.$current.withValue(parent) {
+            TraceScope.$current.withValue(child) {
                 fixedLogger.info("Child")
             }
             appLogger.info("Parent")
         }
         fixedLogger.info("Outside")
         Log.register(recorder: recorder)
-        TraceScope.$current.withValue(SpanContext(traceParent: parent)) {
+        TraceScope.$current.withValue(parent) {
             fixedLogger.info("After unregistering enrichers")
         }
 
         let records = pending.withLock { $0 }
-        #expect(records.map(\.traceParent) == [child, nil, nil])
-        #expect(appRecords.records.map(\.traceParent) == [parent])
-        #expect(appRecords.records.first?.metadata["span_id"] == .string(parent.spanId.hexString))
+        #expect(records.map(\.traceParent) == [child.traceParent, nil, nil])
+        #expect(appRecords.records.map(\.traceParent) == [parent.traceParent])
+        #expect(appRecords.records.first?.metadata["span_id"] == .string(parent.traceParent.spanId.hexString))
         let queued = try #require(records.first)
-        #expect(queued.metadata["span_id"] == .string(child.spanId.hexString))
-        TraceScope.$current.withValue(SpanContext(traceParent: parent)) {
-            #expect(TraceCorrelationEnricher().process(queued).traceParent == child)
+        #expect(queued.metadata["span_id"] == .string(child.traceParent.spanId.hexString))
+        TraceScope.$current.withValue(parent) {
+            #expect(CurrentSpanEnricher().process(queued).traceParent == child.traceParent)
         }
         let data = try JSONEncoder().encode(queued)
         let decoded = try JSONDecoder().decode(LogRecord.self, from: data)
         let output = CaptureExporter()
         LogRecorder(redactors: [TestRedactor(suffix: "_masked")], exporters: [output]).record(decoded)
-        #expect(output.records.first?.traceParent == child)
+        #expect(output.records.first?.traceParent == child.traceParent)
         #expect(output.records.first?.message == "Child_masked")
     }
 

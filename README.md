@@ -161,8 +161,7 @@ Log.register(
     recorder: LogRecorder(
         redactors: [TokenRedactor()],
         exporters: [OSLogExporter(), RemoteExporter()]
-    ),
-    enrichers: [TraceCorrelationEnricher()]
+    )
 )
 
 // Playback
@@ -170,11 +169,36 @@ let logger = Logger(category: "Playback")
 logger.info("Play tapped")
 ```
 
-Each log call takes one snapshot of the application configuration. After merging metadata, the logger runs the registered enrichers synchronously in order. In this example, `TraceCorrelationEnricher` captures the current span in `record.traceParent`, so a recorder can queue the record and export it after the span ends. A logger created with `Logger(category: "Playback", recorder: recorder)` runs the same enrichers and sends the result to its own recorder. Other loggers use the recorder from the snapshot.
+Each log call takes one snapshot of the application configuration. After merging metadata, the logger runs the registered enrichers synchronously in order. A logger created with `Logger(category: "Playback", recorder: recorder)` runs the same enrichers and sends the result to its own recorder. Other loggers use the recorder from the snapshot.
 
 `LogRecorder` applies each enabled redactor once, in order, then sends the final record to every exporter. Both `LogEnricher` and `LogRedactor` inherit `LogRecordProcessor`. A host can also use `[any LogRecordProcessor]` directly and pass each returned record to the next processor.
 
 With no registration, the application uses `LogRecorder()`, which exports to `OSLogExporter`. Register `LogRecorder(exporters: [])` to silence application logging, or register `LogRecorder()` to restore the default output.
+
+### Correlate Logs with the Current Span
+
+Define this enricher in your app target and register it alongside your recorder at startup.
+
+```swift
+import Telescopium
+
+struct AppTraceEnricher: LogEnricher {
+    func process(_ record: LogRecord) -> LogRecord {
+        var result = record
+        result.traceParent = record.traceParent ?? TraceScope.current?.traceParent
+        return result
+    }
+}
+
+Log.register(recorder: LogRecorder(), enrichers: [AppTraceEnricher()])
+
+let logger = Logger(category: "Playback")
+withSpan("Play") { _ in
+    logger.info("Play tapped")
+}
+```
+
+The enricher captures the active span when `logger.info` creates the record. A queued record keeps that parent after the span ends. Outside a span the field stays empty, and a parent set by an earlier enricher takes precedence.
 
 ### OpenTelemetry and Datadog
 
@@ -198,6 +222,8 @@ For example, an App package using a local checkout can select both integrations 
 ```
 
 In a base-only consumer, SwiftPM 6.4 resolves no vendor packages. A Datadog-only consumer builds Datadog Logs and its internal module. SwiftPM also resolves dependencies declared upstream by Datadog, including OTel, even though it doesn't build those modules for logging. In Telescopium's checkout, run `swift test --traits OpenTelemetry,Datadog` to exercise the same Playback record through both SDKs.
+
+This example registers both exporters with the app-defined enricher from [Correlate Logs with the Current Span](#correlate-logs-with-the-current-span).
 
 ```swift
 import Telescopium
@@ -223,7 +249,7 @@ Log.register(
             DatadogLogExporter(logger: ddLogger)
         ]
     ),
-    enrichers: [TraceCorrelationEnricher()]
+    enrichers: [AppTraceEnricher()]
 )
 
 Telescopium.Logger(category: "Playback").warning("Retry playback", metadata: ["attempt": 2])

@@ -42,6 +42,14 @@ private struct EpisodeRedactor: LogRedactor {
     }
 }
 
+private struct PlaybackTraceEnricher: LogEnricher {
+    func process(_ record: LogRecord) -> LogRecord {
+        var result = record
+        result.traceParent = record.traceParent ?? TraceScope.current?.traceParent
+        return result
+    }
+}
+
 private struct BufferingRecorder: LogRecording {
     let pending = LockedValue<LogRecord?>(nil)
 
@@ -115,7 +123,7 @@ struct PlaybackExportTests {
         let previous = Log.currentConfiguration
         defer { Log.register(recorder: previous.recorder, enrichers: previous.enrichers) }
         let buffer = BufferingRecorder()
-        Log.register(recorder: buffer, enrichers: [TraceCorrelationEnricher()])
+        Log.register(recorder: buffer, enrichers: [PlaybackTraceEnricher()])
         let playback = Telescopium.Logger(category: "Playback", metadata: ["episode_id": "ep-42"])
         let route: [String: Any] = [
             "attempt": 2,
