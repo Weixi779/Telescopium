@@ -9,15 +9,14 @@ only_rules:
   - reduce_into
   - discarded_notification_center_observer
   - unhandled_throwing_task
-  - custom_rules
+  - force_unwrapping
+  - force_cast
+  - force_try
+  - cyclomatic_complexity
 
-custom_rules:
-  empty_private_setup_ui:
-    name: "空的私有 setupUI"
-    regex: '^[ \t]*private[ \t]+func[ \t]+setupUI[ \t]*\([ \t]*\)\s*\{\s*\}'
-    match_kinds: [identifier, keyword, typeidentifier, attribute.builtin]
-    message: "setupUI() 当前为空。确认是否需要这个组装步骤，有意留空时写明原因。"
-    severity: warning
+cyclomatic_complexity:
+  # MetadataValue 按类型逐项编解码，分支内部的条件与循环仍参与计数。
+  ignores_case_statements: true
 
 excluded:
   - "**/.build"

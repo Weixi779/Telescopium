@@ -19,10 +19,11 @@ struct MetadataConversionTests {
     }
 
     @Test("Swift and Foundation values retain their numeric types")
-    func numericTypes() {
+    func numericTypes() throws {
+        let decimal = try #require(Decimal(string: "1.0000000000000001"))
         let values: [Any] = [
             NSNumber(value: true), NSNumber(value: 0), NSNumber(value: 1), Int8(-1),
-            UInt64(Int64.max), Float(1.25), Double(1.0), UInt64.max, Decimal(string: "1.0000000000000001")!,
+            UInt64(Int64.max), Float(1.25), Double(1.0), UInt64.max, decimal,
         ]
         let fields = Metadata(converting: ["values": values])
         #expect(fields["values"] == [true, 0, 1, -1, .int(.max), 1.25, 1.0])
