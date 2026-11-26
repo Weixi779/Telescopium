@@ -15,7 +15,7 @@ private struct RecordContext: Encodable {
     let subsystem: String
     let timestampMilliseconds: Int64?
     let location: LogSourceLocation
-    let error: LogErrorInfo?
+    let error: ErrorInfo?
 
     enum CodingKeys: String, CodingKey {
         case category, subsystem, location, error

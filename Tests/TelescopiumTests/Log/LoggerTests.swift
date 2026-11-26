@@ -107,7 +107,7 @@ struct LoggerTests {
         #expect(records[1].location.line == line)
         #expect(retry.location.column > 0)
         #expect(records[1].location.column > retry.location.column)
-        #expect(retry.error == LogErrorInfo(timeout))
+        #expect(retry.error == ErrorInfo(timeout))
         #expect(records[1].error == nil)
 
         let data = try JSONEncoder().encode(retry)

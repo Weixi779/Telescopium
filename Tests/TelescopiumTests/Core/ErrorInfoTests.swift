@@ -1,5 +1,5 @@
 //
-//  LogErrorInfoTests.swift
+//  ErrorInfoTests.swift
 //  Telescopium
 //
 //  Created by weixi on 2026/11/18.
@@ -10,7 +10,7 @@ import Foundation
 import Telescopium
 import Testing
 
-struct LogErrorInfoTests {
+struct ErrorInfoTests {
     enum PlaybackError: Error { case stopped }
 
     enum AudioError: LocalizedError, CustomNSError {
@@ -24,7 +24,7 @@ struct LogErrorInfoTests {
     @Test("An erased Swift error retains its concrete type and description")
     func swiftError() {
         let error: any Error = PlaybackError.stopped
-        let info = LogErrorInfo(error)
+        let info = ErrorInfo(error)
         #expect(info.typeName == String(reflecting: PlaybackError.self))
         #expect(info.message == "stopped")
         #expect(info.domain == nil)
@@ -33,7 +33,7 @@ struct LogErrorInfoTests {
 
     @Test("A custom Swift error supplies its localized description, domain and code")
     func customNSError() {
-        let info = LogErrorInfo(AudioError.unavailable)
+        let info = ErrorInfo(AudioError.unavailable)
         #expect(info.typeName == String(reflecting: AudioError.self))
         #expect(info.message == "Audio unavailable")
         #expect(info.domain == "Playback.Audio")
@@ -47,12 +47,12 @@ struct LogErrorInfoTests {
             code: NSURLErrorNotConnectedToInternet,
             userInfo: [NSLocalizedDescriptionKey: "Offline"],
         )
-        let info = LogErrorInfo(error)
+        let info = ErrorInfo(error)
         #expect(info.message == "Offline")
         #expect(info.domain == NSURLErrorDomain)
         #expect(info.code == NSURLErrorNotConnectedToInternet)
 
-        let urlError = LogErrorInfo(URLError(.timedOut))
+        let urlError = ErrorInfo(URLError(.timedOut))
         #expect(urlError.domain == NSURLErrorDomain)
         #expect(urlError.code == NSURLErrorTimedOut)
     }

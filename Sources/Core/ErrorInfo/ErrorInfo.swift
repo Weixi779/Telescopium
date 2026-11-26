@@ -1,5 +1,5 @@
 //
-//  LogErrorInfo.swift
+//  ErrorInfo.swift
 //  Telescopium
 //
 //  Created by weixi on 2026/11/18.
@@ -8,8 +8,8 @@
 
 import Foundation
 
-/// Serializable error details attached to a log record.
-public struct LogErrorInfo: Sendable, Codable, Equatable {
+/// A serializable snapshot of an error attached to a log or span record.
+public struct ErrorInfo: Sendable, Codable, Equatable {
     public let typeName: String
     public let message: String
     public let domain: String?

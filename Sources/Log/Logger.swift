@@ -63,7 +63,7 @@ public struct Logger: @unchecked Sendable {
                 line: line,
                 column: column,
             ),
-            error: error.map(LogErrorInfo.init),
+            error: error.map(ErrorInfo.init),
             metadata: defaultMetadata.merging(overrides: Metadata(converting: metadata)),
         )
         let configuration = Log.currentConfiguration

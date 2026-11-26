@@ -16,7 +16,7 @@ public struct LogRecord: Sendable, Codable {
     public let subsystem: String
     public var message: String
     public let location: LogSourceLocation
-    public let error: LogErrorInfo?
+    public let error: ErrorInfo?
     public var metadata: Metadata
     /// Identifies the span associated with this record at the logging call site.
     public var traceParent: TraceParent?
@@ -28,7 +28,7 @@ public struct LogRecord: Sendable, Codable {
         subsystem: String,
         message: String,
         location: LogSourceLocation,
-        error: LogErrorInfo? = nil,
+        error: ErrorInfo? = nil,
         metadata: Metadata,
         traceParent: TraceParent? = nil,
     ) {
