@@ -13,4 +13,8 @@ public protocol Span: Sendable {
 
     /// Sets or replaces one field on this span. Calls can overlap.
     func setMetadata(_ value: MetadataValue, forKey key: String)
+
+    /// Appends an event in recording order, including repeated names.
+    /// Calls can overlap. Events received after the span ends are ignored.
+    func addEvent(_ event: SpanEvent)
 }

@@ -17,17 +17,7 @@ public func withSpan<Result>(
     ofKind kind: SpanKind = .internal,
     _ operation: (any Span) throws -> Result,
 ) rethrows -> Result {
-    let span = SpanRecord(name: name, kind: kind, parent: TraceScope.current)
-    do {
-        let result = try TraceScope.$current.withValue(span.context) {
-            try operation(span)
-        }
-        span.end()
-        return result
-    } catch {
-        span.end(throwing: error)
-        throw error
-    }
+    try Trace.currentTracer.withSpan(name, ofKind: kind, operation)
 }
 
 /// Keeps the new span current across suspension and preserves the caller's actor isolation.
@@ -37,15 +27,44 @@ public func withSpan<Result>(
     isolation: isolated (any Actor)? = #isolation,
     _ operation: (any Span) async throws -> Result,
 ) async rethrows -> Result {
-    let span = SpanRecord(name: name, kind: kind, parent: TraceScope.current)
-    do {
-        let result = try await TraceScope.$current.withValue(span.context) {
-            try await operation(span)
+    try await Trace.currentTracer.withSpan(name, ofKind: kind, isolation: isolation, operation)
+}
+
+extension Tracer {
+    func withSpan<Result>(
+        _ name: String,
+        ofKind kind: SpanKind,
+        _ operation: (any Telescopium.Span) throws -> Result,
+    ) rethrows -> Result {
+        let span = startSpan(name, ofKind: kind, parent: TraceScope.current)
+        do {
+            let result = try TraceScope.$current.withValue(span.context) {
+                try operation(span)
+            }
+            endSpan(span, throwing: nil)
+            return result
+        } catch {
+            endSpan(span, throwing: error)
+            throw error
         }
-        span.end()
-        return result
-    } catch {
-        span.end(throwing: error)
-        throw error
+    }
+
+    func withSpan<Result>(
+        _ name: String,
+        ofKind kind: SpanKind,
+        isolation: isolated (any Actor)?,
+        _ operation: (any Telescopium.Span) async throws -> Result,
+    ) async rethrows -> Result {
+        let span = startSpan(name, ofKind: kind, parent: TraceScope.current)
+        do {
+            let result = try await TraceScope.$current.withValue(span.context) {
+                try await operation(span)
+            }
+            endSpan(span, throwing: nil)
+            return result
+        } catch {
+            endSpan(span, throwing: error)
+            throw error
+        }
     }
 }

@@ -32,7 +32,7 @@ dependencies: [
 ## Trace Context Core
 
 `TraceParent` generates, validates, and serializes the W3C Trace Context version `00` format.
-It is a value only: tracing lifecycles, sampling policies, and network propagation remain the caller's responsibility.
+The tracer manages the span lifecycle. The network layer chooses when to propagate the header.
 
 ```swift
 import Telescopium
@@ -67,6 +67,27 @@ source for production identifiers; restarting a fixed seed repeats identifiers. 
 two random words (high, then low), followed by one word for the span identifier; all-zero identifiers are retried.
 
 ## Quick Start
+
+### Scoped Tracing
+
+`withSpan` starts a span, makes its context available through `TraceScope.current`, and ends it when the operation returns or throws. Both synchronous and asynchronous operations use the same API.
+
+```swift
+let order = try await withSpan("Submit order") { span in
+    span.setMetadata("checkout", forKey: "source")
+    return try await orders.submit()
+}
+```
+
+The built-in `TelescopiumTracer` creates a `TelescopiumSpan` for each operation. Its optional `onFinish` callback receives one `SpanRecord` on the caller's thread when the span first ends. The default tracer discards finished records.
+
+```swift
+Trace.register(tracer: TelescopiumTracer { record in
+    print(record.name, record.duration)
+})
+```
+
+An app can also register its own `Tracer`. Each new span uses the current registration and finishes with the tracer that created it.
 
 ### Basic Logging
 
