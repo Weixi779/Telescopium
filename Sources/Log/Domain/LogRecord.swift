@@ -9,7 +9,7 @@
 import Foundation
 
 /// A structured log record for forwarding to external sinks.
-public struct LogRecord: Sendable, Codable {
+public struct LogRecord: Sendable, Equatable, Codable {
     public let timestamp: Date
     public let level: LogLevel
     public let category: String

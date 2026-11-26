@@ -9,7 +9,7 @@
 import Foundation
 
 /// A snapshot of a completed span for export.
-public struct SpanRecord: Sendable {
+public struct SpanRecord: Sendable, Equatable, Codable {
     public let name: String
     public let kind: SpanKind
     public let context: SpanContext

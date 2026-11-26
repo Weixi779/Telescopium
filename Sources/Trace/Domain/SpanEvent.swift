@@ -9,7 +9,7 @@
 import Foundation
 
 /// A named occurrence during a span, with its own timestamp and metadata.
-public struct SpanEvent: Sendable, Equatable {
+public struct SpanEvent: Sendable, Equatable, Codable {
     public let name: String
     public let timestamp: Date
     public let metadata: Metadata
