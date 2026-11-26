@@ -98,7 +98,7 @@ public struct Logger: Sendable {
         )
     }
 
-    /// Logs a debug message. Debug logs are typically not persisted in release builds.
+    /// Sends a debug record to the selected recorder.
     /// - Parameters:
     ///   - msg: The message to log
     ///   - error: An optional error to capture with this record

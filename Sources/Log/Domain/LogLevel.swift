@@ -8,7 +8,7 @@
 
 /// The severity of a log record.
 public enum LogLevel: String, CaseIterable, Codable, Hashable, Sendable {
-    /// Debug messages (typically not persisted in release builds)
+    /// Detailed diagnostic messages
     case debug
     /// Informational messages
     case info

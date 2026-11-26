@@ -8,12 +8,15 @@
 
 import os
 
-/// Writes log records to Apple's unified logging system.
+/// Writes the message, optional error, and source location as private text in Apple's unified log.
 public struct OSLogExporter: LogExporter {
     public init() {}
 
     public func export(_ record: LogRecord) {
         let logger = os.Logger(subsystem: record.subsystem, category: record.category)
+        let level = record.level.osLogType
+        guard logger.isEnabled(type: level) else { return }
+
         var message = record.message
         if let error = record.error {
             message += "\n\(error.typeName): \(error.message)"
@@ -21,15 +24,17 @@ public struct OSLogExporter: LogExporter {
         let location = record.location
         message += "\n[\(location.fileID):\(location.line):\(location.column)] \(location.function)"
 
-        switch record.level {
-        case .debug:
-            logger.debug("\(message, privacy: .private)")
-        case .info:
-            logger.info("\(message, privacy: .private)")
-        case .warning, .error:
-            logger.error("\(message, privacy: .private)")
-        case .fault:
-            logger.fault("\(message, privacy: .private)")
+        logger.log(level: level, "\(message, privacy: .private)")
+    }
+}
+
+private extension LogLevel {
+    var osLogType: OSLogType {
+        switch self {
+        case .debug: .debug
+        case .info: .info
+        case .warning, .error: .error
+        case .fault: .fault
         }
     }
 }

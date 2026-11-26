@@ -207,7 +207,7 @@ Each log call takes one snapshot of the application configuration. After merging
 
 `LogRecorder` applies each enabled redactor once, in order, then sends the final record to every exporter. Both `LogEnricher` and `LogRedactor` inherit `LogRecordProcessor`. A host can also use `[any LogRecordProcessor]` directly and pass each returned record to the next processor.
 
-With no registration, the application uses `LogRecorder()`, which exports to `OSLogExporter`. Register `LogRecorder(exporters: [])` to silence application logging, or register `LogRecorder()` to restore the default output.
+With no registration, the application uses `LogRecorder()`, which exports to `OSLogExporter`. Its console text contains the message, optional error type and description, and source location. Structured exporters can also use the record's metadata and trace parent. Register `LogRecorder(exporters: [])` to silence application logging, or register `LogRecorder()` to restore the default output.
 
 ### Correlate Logs with the Current Span
 
@@ -326,13 +326,15 @@ Log.register(recorder: LogRecorder(redactors: [MaskingRedactor()]))
 
 ## Log Levels
 
-| Level   | Description | Persistence |
+| Level   | Description | Apple unified log type |
 |---------|-------------|-------------|
-| `debug` | Detailed debugging information | Not persisted in Release |
-| `info`  | General informational messages | Persisted |
-| `warning` | Unexpected or recoverable conditions | Persisted as `error` in Apple unified logging |
-| `error` | Error conditions and failures | Persisted |
-| `fault` | Potential bugs, such as a violated program invariant | Persisted |
+| `debug` | Detailed debugging information | `.debug` |
+| `info`  | General informational messages | `.info` |
+| `warning` | Unexpected or recoverable conditions | `.error` |
+| `error` | Error conditions and failures | `.error` |
+| `fault` | Potential bugs, such as a violated program invariant | `.fault` |
+
+In both Debug and Release, the recorder receives the original `LogLevel`. The system logging configuration controls which unified log messages are enabled and retained.
 
 ## Categories
 
@@ -444,7 +446,7 @@ struct DebugMenu: View {
 ```swift
 // ✅ Good
 let logger = Logger()
-logger.debug("Entering function with parameters: \(params)")  // Development only
+logger.debug("Entering function with parameters: \(params)")
 logger.info("User completed onboarding")                       // Important events  
 logger.error("Network request failed", error: error)          // Actionable errors
 
