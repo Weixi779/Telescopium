@@ -21,12 +21,14 @@ A Swift library for structured logging, scoped tracing, and performance measurem
 
 ### Swift Package Manager
 
-Add Telescopium to your project using Xcode or by adding it to your `Package.swift`:
+To use the current checkout, add it as a local package in Xcode or declare the package and its product in your manifest.
 
 ```swift
-dependencies: [
-    .package(url: "https://github.com/Weixi779/Telescopium.git", from: "1.0.0")
-]
+// Package dependency
+.package(path: "../Telescopium")
+
+// Target dependency
+.product(name: "Telescopium", package: "Telescopium")
 ```
 
 ## Trace Context Core
@@ -130,7 +132,7 @@ import Telescopium
 
 let logger = Logger()
 logger.debug("App started")
-logger.info("User logged in successfully") 
+logger.info("User logged in successfully")
 logger.warning("Playback timed out, retrying")
 logger.error("Failed to load data", error: error)
 logger.fault("Player entered the playing state without a current item")
@@ -138,10 +140,6 @@ logger.fault("Player entered the playing state without a current item")
 // Instance interface (for custom categories)
 let networkLogger = Logger(category: "Network")
 networkLogger.info("API request started")
-
-// Predefined categories
-let featureLogger = Logger(category: "Network")
-featureLogger.debug("Connection established")
 ```
 
 ### Structured Metadata
@@ -496,8 +494,6 @@ if ProcessInfo.processInfo.arguments.contains("--export-logs") {
 ```
 
 ## Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 Install the development tools with `brew install swiftformat swiftlint`. Run these commands from the package root as needed.
 
