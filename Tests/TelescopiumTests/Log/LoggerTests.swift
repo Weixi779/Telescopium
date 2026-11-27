@@ -316,7 +316,7 @@ struct LoggerTests {
             },
         )
 
-        DispatchQueue.global().async {
+        Thread.detachNewThread {
             logger.info("In flight")
             finished.signal()
         }

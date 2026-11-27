@@ -129,7 +129,7 @@ struct TelescopiumTracerTests {
         let firstEndReturned = DispatchSemaphore(value: 0)
         let tracer = TelescopiumTracer(exporter: exporter)
         let span = tracer.startSpan("Request", ofKind: .client, parent: nil)
-        DispatchQueue.global().async {
+        Thread.detachNewThread {
             tracer.endSpan(span, throwing: nil)
             firstEndReturned.signal()
         }
@@ -152,7 +152,7 @@ struct TelescopiumTracerTests {
             #expect(repeatedEndReturned.wait(timeout: .now() + 5) == .success)
             return "Offline"
         }
-        DispatchQueue.global().async {
+        Thread.detachNewThread {
             tracer.endSpan(span, throwing: firstError)
             delivered.signal()
         }

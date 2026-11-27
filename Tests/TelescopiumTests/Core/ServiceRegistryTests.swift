@@ -7,6 +7,7 @@
 //
 
 import Dispatch
+import Foundation
 import Testing
 @testable import Telescopium
 
@@ -55,7 +56,7 @@ struct ServiceRegistryTests {
             },
         )
 
-        DispatchQueue.global().async {
+        Thread.detachNewThread {
             registry.register(ServiceWithCleanup.self, instance: replacement)
         }
         #expect(released.wait(timeout: .now() + 5) == .success)
