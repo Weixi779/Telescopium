@@ -13,9 +13,9 @@ public struct OSLogExporter: LogExporter {
     public init() {}
 
     public func export(_ record: LogRecord) {
-        let logger = os.Logger(subsystem: record.subsystem, category: record.category)
+        let log = OSLog(subsystem: record.subsystem, category: record.category)
         let level = record.level.osLogType
-        guard logger.isEnabled(type: level) else { return }
+        guard log.isEnabled(type: level) else { return }
 
         var message = record.message
         if let error = record.error {
@@ -24,7 +24,7 @@ public struct OSLogExporter: LogExporter {
         let location = record.location
         message += "\n[\(location.fileID):\(location.line):\(location.column)] \(location.function)"
 
-        logger.log(level: level, "\(message, privacy: .private)")
+        os.Logger(log).log(level: level, "\(message, privacy: .private)")
     }
 }
 
