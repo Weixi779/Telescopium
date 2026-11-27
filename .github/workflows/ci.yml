@@ -46,8 +46,14 @@ jobs:
 
       - name: Build for iOS, tvOS and watchOS
         run: |
-          for platform in iOS tvOS watchOS; do
-            xcodebuild -scheme Telescopium -configuration Release \
-              -destination "generic/platform=$platform" -derivedDataPath "$RUNNER_TEMP/build" \
-              CODE_SIGNING_ALLOWED=NO build
-          done
+          build_for_device() {
+            local sdk_path
+            sdk_path=$(xcrun --sdk "$1" --show-sdk-path)
+            swift build -c release --target Telescopium \
+              --sdk "$sdk_path" --triple "$2" --scratch-path "$RUNNER_TEMP/build/$2"
+          }
+
+          build_for_device iphoneos arm64-apple-ios16.0
+          build_for_device appletvos arm64-apple-tvos16.0
+          build_for_device watchos arm64_32-apple-watchos9.0
+          build_for_device watchos arm64-apple-watchos9.0
